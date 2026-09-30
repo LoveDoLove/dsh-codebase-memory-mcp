@@ -21,6 +21,9 @@ jobs:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Upgrade npm to >=11.15.0 (required for npm stage publish)
+        run: npm install -g npm@latest
+
       - name: Run test suite
         run: npm test
 
@@ -46,7 +49,7 @@ jobs:
           echo "after=${after}" >> "$GITHUB_OUTPUT"
 
       - name: Publish to npm
-        run: npm publish --access public
+        run: npm stage publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
