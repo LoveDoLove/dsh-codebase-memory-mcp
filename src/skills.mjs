@@ -119,12 +119,12 @@ export function createBundledSkillProvider() {
       exists: existsSync(dir),
       invocation: SKILL_INVOCATION,
       provider: SKILL_PROVIDER_NAME,
+      rank: BUNDLED_SKILL_RANK,
     }
   })
 
   return {
     name: SKILL_PROVIDER_NAME,
-    rank: BUNDLED_SKILL_RANK,
     async list() {
       return candidates.filter((c) => c.exists)
     },
