@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -32,8 +33,6 @@ jobs:
       # and commit the new version back (marked [skip publish] to avoid a loop).
       - name: Ensure unpublished version
         id: version
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
           pkg="$(node -p "require('./package.json').name")"
@@ -50,8 +49,6 @@ jobs:
 
       - name: Publish to npm
         run: npm stage publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Commit bumped version
         if: steps.version.outputs.before != steps.version.outputs.after
