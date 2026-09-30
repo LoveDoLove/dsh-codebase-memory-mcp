@@ -11,17 +11,64 @@ import {
   registerCbmTools,
 } from './bridge.mjs';
 
+export const name = 'codebase-memory';
+export const inject = ['tools'];
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const SKILL_FILE = join(__dirname, '../skills/codebase-memory/SKILL.md');
 
-function registerBundledSkills(ctx) {
-  if (!ctx?.skills || typeof ctx.skills.registerProvider !== 'function') return;
-  if (!existsSync(SKILL_FILE)) return;
+export const GUIDANCE_TEXT = `## Codebase Memory — Knowledge Graph Policy
+Codebase Memory provides structural code intelligence and AST-level call-graph navigation.
+Tools: \`cbm_projects\`, \`cbm_search\`, \`cbm_snippet\`, \`cbm_trace\`, \`cbm_arch\`, \`cbm_search_code\`.
+Web visual graph interface: http://localhost:9749/
+
+When to use Codebase Memory vs text grep:
+- Prefer \`cbm_trace\` for caller/callee relationships, call hierarchies, and blast-radius / impact analysis (precise structural graph vs noisy text search).
+- Prefer \`cbm_search\` to discover functions, classes, interfaces, or files by name pattern or AST label.
+- Prefer \`cbm_snippet\` to retrieve exact symbol definitions and their immediate context with minimal token overhead.
+- Prefer \`cbm_arch\` for directory-level component dependency overview.
+- Use \`grep\`/\`read\` when editing files, reading non-code assets, or searching exact string literals.
+
+Workflow:
+1. Identify the indexed project: call \`cbm_projects()\`. By default tools infer project from workspace.
+2. Search symbols: \`cbm_search(name_pattern="...")\` to find exact symbol names.
+3. Trace dependencies: \`cbm_trace(symbol="...", direction="inbound"|"outbound"|"both")\` to trace call graphs.
+4. Inspect definition: \`cbm_snippet(qualified_name="...")\` to inspect code without loading entire files.`;
+
+function loggerOf(ctx) {
+  const log = ctx.logger ? ctx.logger('codebase-memory') : console;
+  return {
+    info: (...args) => { try { log.info(...args); } catch { /* ignore */ } },
+    warn: (...args) => { try { log.warn(...args); } catch { /* ignore */ } },
+    debug: (...args) => { try { log.debug?.(...args); } catch { /* ignore */ } },
+  };
+}
+
+export function registerSystemPromptGuidance(scope, log) {
+  if (!scope?.systemPrompt || typeof scope.systemPrompt.section !== 'function') return false;
+  try {
+    scope.systemPrompt.section({
+      name: 'codebase-memory:guidance',
+      order: 3040,
+      text: GUIDANCE_TEXT,
+    });
+    log?.info('[codebase-memory] registered system prompt guidance');
+    return true;
+  } catch (err) {
+    log?.warn(`[codebase-memory] systemPrompt.section failed: ${err instanceof Error ? err.message : String(err)}`);
+    return false;
+  }
+}
+
+export async function registerSkills(scope, log) {
+  const skills = scope?.skills;
+  if (!skills) return [];
+  if (!existsSync(SKILL_FILE)) return [];
 
   try {
     const raw = readFileSync(SKILL_FILE, 'utf8');
-    const content = raw.replace(/^---\s*\n[\s\S]*?\n---\s*/m, '').trim();
+    const content = raw.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '').trim();
     const candidate = {
       name: 'codebase-memory',
       description:
@@ -29,42 +76,54 @@ function registerBundledSkills(ctx) {
       invocation: 'user-or-agent',
       provider: 'codebase-memory-bundled',
       source: 'bundled',
+      rank: 20,
+      resourceBase: { kind: 'directory', path: dirname(SKILL_FILE) },
       locator: pathToFileURL(SKILL_FILE),
+      path: SKILL_FILE,
     };
 
-    const provider = {
-      name: 'codebase-memory-bundled',
-      list: async () => [candidate],
-      get: async () => ({
-        ...candidate,
+    if (typeof skills.registerProvider === 'function') {
+      const provider = {
+        name: 'codebase-memory-bundled',
+        list: async () => [candidate],
+        get: async () => ({ ...candidate, content }),
+      };
+      skills.registerProvider(() => provider);
+      return [candidate.name];
+    }
+
+    if (typeof skills.register === 'function') {
+      skills.register({
+        name: candidate.name,
+        description: candidate.description,
         content,
-      }),
-    };
-
-    ctx.skills.registerProvider(() => provider);
+        source: 'bundled',
+        path: SKILL_FILE,
+      });
+      return [candidate.name];
+    }
   } catch (err) {
-    console.warn('[codebase-memory] Failed to register bundled skill:', err.message);
+    log?.warn(`[codebase-memory] skill registration failed: ${err instanceof Error ? err.message : String(err)}`);
   }
+  return [];
 }
 
-function registerSlashCommands(ctx) {
-  if (!ctx?.commands || typeof ctx.commands.register !== 'function') return;
+export function registerSlashCommands(scope, log) {
+  if (!scope?.commands || typeof scope.commands.register !== 'function') return false;
   try {
-    ctx.effect(() => {
-      ctx.commands.register({
+    scope.effect(() => {
+      scope.commands.register({
         name: 'cbm',
         description: 'Show codebase-memory status and Web UI link (http://localhost:9749/)',
         execute: async () => {
           const exe = findExe();
           if (!exe) {
-            return '⚠️ codebase-memory-mcp executable not found. Please install codebase-memory-mcp or set CBM_EXE.';
+            return '⚠️  codebase-memory-mcp executable not found. Install codebase-memory-mcp or set CBM_EXE.';
           }
           const client = getOrCreateClient();
           let projectList = '';
           try {
-            if (client) {
-              projectList = await client.call('list_projects', {});
-            }
+            if (client) projectList = await client.call('list_projects', {});
           } catch (e) {
             projectList = `Error querying projects: ${e.message}`;
           }
@@ -81,8 +140,9 @@ function registerSlashCommands(ctx) {
         },
       });
     }, 'codebase-memory: slash-commands');
+    return true;
   } catch {
-    // Ignore if commands service is unavailable
+    return false;
   }
 }
 
@@ -92,51 +152,55 @@ function registerSlashCommands(ctx) {
  * @param {object} [config] Plugin options
  */
 export function apply(ctx, config = {}) {
-  const exe = findExe();
-  if (!exe) {
-    console.warn(
-      '\x1b[33m[codebase-memory]\x1b[0m ⚠️ codebase-memory-mcp not installed (optional for advanced code search)'
-    );
-    return;
+  const log = loggerOf(ctx);
+
+  // 1. Tool registration & auto-start (ctx.tools is guaranteed by inject=['tools'])
+  const toolNames = cbmApply(ctx);
+  if (Array.isArray(toolNames) && toolNames.length) {
+    log.info(`[codebase-memory] registered tools: ${toolNames.join(', ')}`);
   }
 
-  // 1. Tool registration & auto-start
-  if (typeof ctx?.inject === 'function') {
+  // 2. System prompt — must use ctx.inject(), never direct property access
+  if (typeof ctx.inject === 'function') {
     try {
-      ctx.inject(['tools'], (targetCtx) => cbmApply(targetCtx));
+      ctx.inject(['systemPrompt'], (scope) => {
+        registerSystemPromptGuidance(scope, log);
+      });
     } catch {
-      cbmApply(ctx);
+      // systemPrompt service not available; skip
     }
-  } else {
-    cbmApply(ctx);
   }
 
-  // 2. Bundled skill registration
-  if (typeof ctx?.inject === 'function') {
+  // 3. Bundled skill registration — must use ctx.inject()
+  if (typeof ctx.inject === 'function') {
     try {
-      ctx.inject(['skills'], (targetCtx) => registerBundledSkills(targetCtx));
+      ctx.inject(['skills'], (scope) => {
+        void registerSkills(scope, log).then((names) => {
+          if (names.length) log.info(`[codebase-memory] registered skill: ${names.join(', ')}`);
+        }).catch((err) => {
+          log.warn(`[codebase-memory] skill register failed: ${err instanceof Error ? err.message : String(err)}`);
+        });
+      });
     } catch {
-      registerBundledSkills(ctx);
+      // skills service not available; skip
     }
-  } else {
-    registerBundledSkills(ctx);
   }
 
-  // 3. Slash command registration
-  if (typeof ctx?.inject === 'function') {
+  // 4. Slash command registration — must use ctx.inject()
+  if (typeof ctx.inject === 'function') {
     try {
-      ctx.inject(['commands'], (targetCtx) => registerSlashCommands(targetCtx));
+      ctx.inject(['commands'], (scope) => {
+        if (registerSlashCommands(scope, log)) {
+          log.info('[codebase-memory] registered /cbm command');
+        }
+      });
     } catch {
-      registerSlashCommands(ctx);
+      // commands service not available; skip
     }
-  } else {
-    registerSlashCommands(ctx);
   }
 }
 
-export default {
-  apply,
-};
+export default { name, inject, apply };
 
 export {
   cbmApply,

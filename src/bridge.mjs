@@ -286,6 +286,7 @@ export function autoStartCodebaseMemory() {
  * Register cbm_* tools onto ctx.tools using defineTool (if available) or pass-through.
  */
 export function registerCbmTools(ctx, client) {
+  const registered = [];
   const withProject = (args) => {
     const a = { ...args };
     if (a.project === undefined && a.repo) a.project = projectNameFromPath(a.repo);
@@ -303,13 +304,15 @@ export function registerCbmTools(ctx, client) {
       },
       isConcurrencySafe: () => true,
     });
-    return ctx.effect(() => ctx.tools.register(toolObj), `codebase-memory.cbm.${spec.name}`);
+    ctx.effect(() => ctx.tools.register(toolObj), `codebase-memory.cbm.${spec.name}`);
+    registered.push(spec.name);
+    return toolObj;
   };
 
   register({
     name: 'cbm_projects',
     description: 'List all projects currently indexed in codebase-memory-mcp.',
-    parameters: { type: 'object', properties: {} },
+    parameters: {},
     execute: async () => client.call('list_projects', {}),
   });
 
@@ -318,15 +321,12 @@ export function registerCbmTools(ctx, client) {
     description:
       'Search the code knowledge graph for symbols, functions, classes, or files. Filter by name_pattern, label (Function, Class, Interface, File), or degree.',
     parameters: {
-      type: 'object',
-      properties: {
-        project: { type: 'string', description: 'Project name (e.g. C-repos-myproject). Defaults to current repo.' },
-        repo: { type: 'string', description: 'Repository root path as fallback if project name not known.' },
-        name_pattern: { type: 'string', description: 'Regex/substring to filter node names (e.g. ".*auth.*").' },
-        label: { type: 'string', description: 'Node label filter: Function | Class | Interface | File' },
-        file_path_pattern: { type: 'string', description: 'Regex to filter by file path.' },
-        limit: { type: 'number', description: 'Maximum results to return (default 50).' },
-      },
+      project: { type: 'string', description: 'Project name (e.g. C-repos-myproject). Defaults to current repo.' },
+      repo: { type: 'string', description: 'Repository root path as fallback if project name not known.' },
+      name_pattern: { type: 'string', description: 'Regex/substring to filter node names (e.g. ".*auth.*").' },
+      label: { type: 'string', description: 'Node label filter: Function | Class | Interface | File' },
+      file_path_pattern: { type: 'string', description: 'Regex to filter by file path.' },
+      limit: { type: 'number', description: 'Maximum results to return (default 50).' },
     },
     execute: async (args) => {
       const a = withProject(args);
@@ -345,15 +345,12 @@ export function registerCbmTools(ctx, client) {
     name: 'cbm_snippet',
     description: 'Fetch the exact source code snippet for a qualified symbol or function from codebase-memory.',
     parameters: {
-      type: 'object',
-      properties: {
-        project: { type: 'string', description: 'Project name.' },
-        repo: { type: 'string', description: 'Repository root path.' },
-        qualified_name: { type: 'string', description: 'Full qualified name of the symbol (e.g. "app.auth.login").' },
-        file_path: { type: 'string', description: 'File path containing the symbol.' },
-        start_line: { type: 'number', description: 'Start line (1-based, optional).' },
-        end_line: { type: 'number', description: 'End line (optional).' },
-      },
+      project: { type: 'string', description: 'Project name.' },
+      repo: { type: 'string', description: 'Repository root path.' },
+      qualified_name: { type: 'string', description: 'Full qualified name of the symbol (e.g. "app.auth.login").' },
+      file_path: { type: 'string', description: 'File path containing the symbol.' },
+      start_line: { type: 'number', description: 'Start line (1-based, optional).' },
+      end_line: { type: 'number', description: 'End line (optional).' },
     },
     execute: async (args) => {
       const a = withProject(args);
@@ -372,13 +369,10 @@ export function registerCbmTools(ctx, client) {
     name: 'cbm_arch',
     description: 'Get an architectural summary of a directory: key components, entry points, and dependencies.',
     parameters: {
-      type: 'object',
-      properties: {
-        project: { type: 'string', description: 'Project name.' },
-        repo: { type: 'string', description: 'Repository root path.' },
-        directory: { type: 'string', description: 'Subdirectory to analyze (relative to repo root).' },
-        depth: { type: 'number', description: 'Analysis depth (default 2).' },
-      },
+      project: { type: 'string', description: 'Project name.' },
+      repo: { type: 'string', description: 'Repository root path.' },
+      directory: { type: 'string', description: 'Subdirectory to analyze (relative to repo root).' },
+      depth: { type: 'number', description: 'Analysis depth (default 2).' },
     },
     execute: async (args) => {
       const a = withProject(args);
@@ -395,15 +389,11 @@ export function registerCbmTools(ctx, client) {
     name: 'cbm_trace',
     description: 'Trace inbound/outbound call paths through the knowledge graph from a specific symbol.',
     parameters: {
-      type: 'object',
-      properties: {
-        project: { type: 'string', description: 'Project name.' },
-        repo: { type: 'string', description: 'Repository root path.' },
-        symbol: { type: 'string', description: 'Target symbol or function name to trace from.' },
-        direction: { type: 'string', enum: ['inbound', 'outbound', 'both'], description: 'Trace direction (default "both").' },
-        max_depth: { type: 'number', description: 'Maximum hop depth (default 3).' },
-      },
-      required: ['symbol'],
+      project: { type: 'string', description: 'Project name.' },
+      repo: { type: 'string', description: 'Repository root path.' },
+      symbol: { type: 'string', required: true, description: 'Target symbol or function name to trace from.' },
+      direction: { type: 'string', enum: ['inbound', 'outbound', 'both'], description: 'Trace direction (default "both").' },
+      max_depth: { type: 'number', description: 'Maximum hop depth (default 3).' },
     },
     execute: async (args) => {
       const a = withProject(args);
@@ -421,15 +411,11 @@ export function registerCbmTools(ctx, client) {
     name: 'cbm_search_code',
     description: 'Fast textual regex search over indexed repository files in codebase-memory.',
     parameters: {
-      type: 'object',
-      properties: {
-        project: { type: 'string', description: 'Project name.' },
-        repo: { type: 'string', description: 'Repository root path.' },
-        query: { type: 'string', description: 'Search term or regex pattern.' },
-        file_pattern: { type: 'string', description: 'Glob/regex to restrict file paths.' },
-        limit: { type: 'number', description: 'Maximum results (default 50).' },
-      },
-      required: ['query'],
+      project: { type: 'string', description: 'Project name.' },
+      repo: { type: 'string', description: 'Repository root path.' },
+      query: { type: 'string', required: true, description: 'Search term or regex pattern.' },
+      file_pattern: { type: 'string', description: 'Glob/regex to restrict file paths.' },
+      limit: { type: 'number', description: 'Maximum results (default 50).' },
     },
     execute: async (args) => {
       const a = withProject(args);
@@ -442,6 +428,8 @@ export function registerCbmTools(ctx, client) {
       });
     },
   });
+
+  return registered;
 }
 
 /**
@@ -449,7 +437,7 @@ export function registerCbmTools(ctx, client) {
  */
 export function cbmApply(ctx) {
   const client = getOrCreateClient();
-  if (!client) return;
+  if (!client) return [];
 
   ctx.effect(() => () => {
     client.dispose();
@@ -475,6 +463,7 @@ export function cbmApply(ctx) {
   }
 
   if (ctx?.tools && typeof ctx.tools.register === 'function') {
-    registerCbmTools(ctx, client);
+    return registerCbmTools(ctx, client);
   }
+  return [];
 }

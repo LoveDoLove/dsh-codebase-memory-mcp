@@ -161,14 +161,23 @@ test('registerCbmTools registers all 6 cbm_* tools and handles execution', async
 
 // --- Plugin apply hook ---
 
-test('plugin apply registers tools, skills and commands on Cordis context', async () => {
+test('plugin apply registers tools, skills, commands and systemPrompt on Cordis context', async () => {
   let skillProviderRegistered = false;
   let commandRegistered = false;
+  let systemPromptRegistered = false;
   const registeredTools = [];
 
   const mockCtx = {
     tools: {
       register: (tool) => registeredTools.push(tool.name),
+    },
+    systemPrompt: {
+      section: (sec) => {
+        systemPromptRegistered = true;
+        assert.equal(sec.name, 'codebase-memory:guidance');
+        assert.equal(sec.order, 3040);
+        assert.match(sec.text, /Codebase Memory/);
+      },
     },
     skills: {
       registerProvider: (fn) => {
@@ -193,6 +202,7 @@ test('plugin apply registers tools, skills and commands on Cordis context', asyn
     assert.ok(registeredTools.length >= 6, 'Tools should be registered');
     assert.ok(skillProviderRegistered, 'Skill provider should be registered');
     assert.ok(commandRegistered, 'Command /cbm should be registered');
+    assert.ok(systemPromptRegistered, 'System prompt section should be registered');
   }
 });
 
