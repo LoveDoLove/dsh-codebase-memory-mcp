@@ -1,6 +1,3 @@
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import { dirname, join } from 'node:path';
-import { readFileSync, existsSync } from 'node:fs';
 import {
   cbmApply,
   getOrCreateClient,
@@ -10,13 +7,10 @@ import {
   createClient,
   registerCbmTools,
 } from './bridge.mjs';
+import { registerSkills } from './skills.mjs';
 
 export const name = 'codebase-memory';
 export const inject = ['tools'];
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const SKILL_FILE = join(__dirname, '../skills/codebase-memory/SKILL.md');
 
 export const GUIDANCE_TEXT = `## Codebase Memory — Knowledge Graph Policy
 Codebase Memory provides structural code intelligence and AST-level call-graph navigation.
@@ -59,53 +53,6 @@ export function registerSystemPromptGuidance(scope, log) {
     log?.warn(`[codebase-memory] systemPrompt.section failed: ${err instanceof Error ? err.message : String(err)}`);
     return false;
   }
-}
-
-export async function registerSkills(scope, log) {
-  const skills = scope?.skills;
-  if (!skills) return [];
-  if (!existsSync(SKILL_FILE)) return [];
-
-  try {
-    const raw = readFileSync(SKILL_FILE, 'utf8');
-    const content = raw.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '').trim();
-    const candidate = {
-      name: 'codebase-memory',
-      description:
-        'Use the codebase knowledge graph for structural code queries. Triggers on: explore the codebase, understand the architecture, what functions exist, show me the structure, who calls this function, what does X call, trace the call chain, find callers of, show dependencies, impact analysis, dead code, unused functions, high fan-out, refactor candidates, code quality audit, graph query syntax, Cypher query examples, edge types, how to use search_graph.',
-      invocation: 'user-or-agent',
-      provider: 'codebase-memory-bundled',
-      source: 'bundled',
-      rank: 20,
-      resourceBase: { kind: 'directory', path: dirname(SKILL_FILE) },
-      locator: pathToFileURL(SKILL_FILE),
-      path: SKILL_FILE,
-    };
-
-    if (typeof skills.registerProvider === 'function') {
-      const provider = {
-        name: 'codebase-memory-bundled',
-        list: async () => [candidate],
-        get: async () => ({ ...candidate, content }),
-      };
-      skills.registerProvider(() => provider);
-      return [candidate.name];
-    }
-
-    if (typeof skills.register === 'function') {
-      skills.register({
-        name: candidate.name,
-        description: candidate.description,
-        content,
-        source: 'bundled',
-        path: SKILL_FILE,
-      });
-      return [candidate.name];
-    }
-  } catch (err) {
-    log?.warn(`[codebase-memory] skill registration failed: ${err instanceof Error ? err.message : String(err)}`);
-  }
-  return [];
 }
 
 export function registerSlashCommands(scope, log) {

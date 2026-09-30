@@ -183,7 +183,7 @@ test('plugin apply registers tools, skills, commands and systemPrompt on Cordis 
       registerProvider: (fn) => {
         skillProviderRegistered = true;
         const provider = fn();
-        assert.equal(provider.name, 'codebase-memory-bundled');
+        assert.equal(provider.name, 'codebase-memory');
       },
     },
     commands: {
