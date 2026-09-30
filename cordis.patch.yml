@@ -1,0 +1,4 @@
+# dsh-codebase-memory-mcp: Cordis bundle patch
+- insert:
+    - id: dsh-codebase-memory-mcp
+      name: '@lovedolove/dsh-codebase-memory-mcp'

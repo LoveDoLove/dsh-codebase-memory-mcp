@@ -1,0 +1,87 @@
+name: Publish @lovedolove/dsh-codebase-memory-mcp to npm
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    if: github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[skip publish]')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Run test suite
+        run: npm test
+
+      # Every push to main publishes. npm versions are immutable, so if
+      # package.json already exists on the registry, bump the patch first
+      # and commit the new version back (marked [skip publish] to avoid a loop).
+      - name: Ensure unpublished version
+        id: version
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          pkg="$(node -p "require('./package.json').name")"
+          before="$(node -p "require('./package.json').version")"
+          if npm view "${pkg}@${before}" version >/dev/null 2>&1; then
+            echo "npm already has ${pkg}@${before}; bumping patch"
+            npm version patch --no-git-tag-version
+          else
+            echo "npm does not have ${pkg}@${before}; publishing as-is"
+          fi
+          after="$(node -p "require('./package.json').version")"
+          echo "before=${before}" >> "$GITHUB_OUTPUT"
+          echo "after=${after}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish to npm
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Commit bumped version
+        if: steps.version.outputs.before != steps.version.outputs.after
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json
+          git commit -m "chore: bump version to ${{ steps.version.outputs.after }} [skip publish]"
+          git push
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CBM_VERSION: ${{ steps.version.outputs.after }}
+        run: |
+          set -euo pipefail
+          tag="v${CBM_VERSION}"
+          if gh release view "${tag}" >/dev/null 2>&1; then
+            echo "Release ${tag} already exists; skipping."
+            exit 0
+          fi
+          notes="$(mktemp)"
+          awk -v v="${CBM_VERSION}" '
+            BEGIN { esc = v; gsub(/\./, "\\.", esc) }
+            $0 ~ "^## \\[" esc "\\]" { found = 1; next }
+            /^## / && found { exit }
+            found { print }
+          ' CHANGELOG.md > "${notes}" || true
+          if [ -s "${notes}" ]; then
+            gh release create "${tag}" --title "${tag}" --notes-file "${notes}"
+          else
+            rm -f "${notes}"
+            gh release create "${tag}" --title "${tag}" --generate-notes
+          fi
+          echo "Created GitHub release ${tag}"

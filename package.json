@@ -1,0 +1,78 @@
+{
+  "name": "@lovedolove/dsh-codebase-memory-mcp",
+  "version": "0.1.0",
+  "description": "Codebase Memory MCP bridge plugin for DeepSeek Harness: knowledge-graph code search, snippets, architecture, call-path tracing, and auto-started graph visualization UI.",
+  "type": "module",
+  "main": "src/index.mjs",
+  "exports": {
+    ".": "./src/index.mjs",
+    "./bridge": "./src/bridge.mjs",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "skills",
+    "cordis.patch.yml",
+    "LICENSE",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "compatibility": {
+      "dshVersions": ">=0.1.2-rc.1 <0.3.0-0",
+      "nodeVersions": ">=18.0.0 <25.0.0"
+    }
+  },
+  "engines": {
+    "node": ">=18.0.0 <25.0.0"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "pack:check": "npm pack --dry-run"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=4.0.1-rc.1 <5.0.0-0",
+    "@deepseek-ai/dsh-tools": ">=0.1.2-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-skill": ">=0.1.2-rc.1 <0.3.0-0"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/cordis": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-tools": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-skill": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LoveDoLove/dsh-codebase-memory-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/LoveDoLove/dsh-codebase-memory-mcp/issues"
+  },
+  "homepage": "https://github.com/LoveDoLove/dsh-codebase-memory-mcp#readme",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "codebase-memory",
+    "codebase-memory-mcp",
+    "mcp",
+    "knowledge-graph",
+    "code-search",
+    "ast",
+    "graph"
+  ],
+  "author": "LoveDoLove <v0130p5100cuboss@gmail.com>",
+  "license": "MIT"
+}
