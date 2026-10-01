@@ -42,11 +42,14 @@ function loggerOf(ctx) {
 export function registerSystemPromptGuidance(scope, log) {
   if (!scope?.systemPrompt || typeof scope.systemPrompt.section !== 'function') return false;
   try {
-    scope.systemPrompt.section({
-      name: 'codebase-memory:guidance',
-      order: 3040,
-      text: GUIDANCE_TEXT,
-    });
+    scope.effect(
+      () => scope.systemPrompt.section({
+        name: 'codebase-memory:guidance',
+        order: 3040,
+        text: GUIDANCE_TEXT,
+      }),
+      'codebase-memory: guidance',
+    );
     log?.info('[codebase-memory] registered system prompt guidance');
     return true;
   } catch (err) {
@@ -58,23 +61,27 @@ export function registerSystemPromptGuidance(scope, log) {
 export function registerSlashCommands(scope, log) {
   if (!scope?.commands || typeof scope.commands.register !== 'function') return false;
   try {
-    scope.effect(() => {
-      scope.commands.register({
-        name: 'cbm',
-        description: 'Show codebase-memory status and Web UI link (http://localhost:9749/)',
-        execute: async () => {
-          const exe = findExe();
-          if (!exe) {
-            return '⚠️  codebase-memory-mcp executable not found. Install codebase-memory-mcp or set CBM_EXE.';
-          }
-          const client = getOrCreateClient();
-          let projectList = '';
-          try {
-            if (client) projectList = await client.call('list_projects', {});
-          } catch (e) {
-            projectList = `Error querying projects: ${e.message}`;
-          }
-          return [
+    scope.effect(() => scope.commands.register({
+      name: 'cbm',
+      description: 'Show codebase-memory status and Web UI link (http://localhost:9749/)',
+      handler: async () => {
+        const exe = findExe();
+        if (!exe) {
+          return {
+            kind: 'success',
+            text: '⚠️  codebase-memory-mcp executable not found. Install codebase-memory-mcp or set CBM_EXE.',
+          };
+        }
+        const client = getOrCreateClient();
+        let projectList = '';
+        try {
+          if (client) projectList = await client.call('list_projects', {});
+        } catch (e) {
+          projectList = `Error querying projects: ${e.message}`;
+        }
+        return {
+          kind: 'success',
+          text: [
             '🔍 **Codebase Memory MCP**',
             `• Executable: \`${exe}\``,
             '• Web UI: http://localhost:9749/',
@@ -83,10 +90,10 @@ export function registerSlashCommands(scope, log) {
             '```',
             projectList.trim() || 'No projects indexed yet.',
             '```',
-          ].join('\n');
-        },
-      });
-    }, 'codebase-memory: slash-commands');
+          ].join('\n'),
+        };
+      },
+    }), 'codebase-memory: slash-commands');
     return true;
   } catch {
     return false;

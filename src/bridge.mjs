@@ -441,7 +441,8 @@ export function cbmApply(ctx) {
 
   ctx.effect(() => () => {
     client.dispose();
-  });
+    if (sharedClient === client) sharedClient = null;
+  }, 'codebase-memory: client');
 
   // Eagerly start daemon/UI on plugin load unless running inside unit tests
   const isTest =

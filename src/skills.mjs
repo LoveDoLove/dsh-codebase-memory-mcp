@@ -13,7 +13,7 @@
 import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const PLUGIN_ROOT = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = join(PLUGIN_ROOT, '..')
@@ -109,14 +109,16 @@ export function parseSkillMarkdown(raw, fallbackName = 'codebase-memory') {
 
 export function createBundledSkillProvider() {
   const candidates = BUNDLED_SKILL_DEFINITIONS.map((def) => {
-    const dir = dirname(skillFileFor(def.name))
+    const file = skillFileFor(def.name)
     return {
       name: def.name,
       description: def.description,
       whenToUse: def.whenToUse,
       source: 'bundled',
-      path: skillFileFor(def.name),
-      exists: existsSync(dir),
+      path: file,
+      locator: pathToFileURL(file),
+      resourceBase: { kind: 'directory', path: dirname(file) },
+      exists: existsSync(file),
       invocation: SKILL_INVOCATION,
       provider: SKILL_PROVIDER_NAME,
       rank: BUNDLED_SKILL_RANK,
@@ -128,10 +130,11 @@ export function createBundledSkillProvider() {
     async list() {
       return candidates.filter((c) => c.exists)
     },
-    async load(name) {
-      const candidate = candidates.find((c) => c.name === name)
-      if (!candidate || !candidate.exists) return null
-      const raw = await readFile(candidate.path, 'utf8')
+    async get(candidate) {
+      if (!(candidate?.locator instanceof URL)) {
+        throw new Error('codebase-memory skill candidate is missing its locator URL')
+      }
+      const raw = await readFile(fileURLToPath(candidate.locator), 'utf8')
       const parsed = parseSkillMarkdown(raw, candidate.name)
       return {
         name: parsed.name,
@@ -140,6 +143,7 @@ export function createBundledSkillProvider() {
         content: parsed.content,
         source: 'bundled',
         path: candidate.path,
+        resourceBase: candidate.resourceBase,
         invocation: candidate.invocation,
         provider: SKILL_PROVIDER_NAME,
       }
