@@ -8,6 +8,7 @@
 [![npm version](https://img.shields.io/npm/v/@lovedolove/dsh-codebase-memory-mcp.svg)](https://www.npmjs.com/package/@lovedolove/dsh-codebase-memory-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![CI](https://github.com/LoveDoLove/dsh-codebase-memory-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/LoveDoLove/dsh-codebase-memory-mcp/actions/workflows/ci.yml)
+[![M8ven Score](https://m8ven.ai/badge/mcp/lovedolove/dsh-codebase-memory-mcp)](https://m8ven.ai/mcp/lovedolove/dsh-codebase-memory-mcp?s=readme)
 
 ---
 
