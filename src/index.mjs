@@ -6,14 +6,10 @@
  */
 
 import {
-  cbmApply,
-  getOrCreateClient,
-  findExe,
   projectNameFromPath,
-  autoStartCodebaseMemory,
-  createClient,
-  registerCbmTools,
 } from './bridge.mjs'
+import { getOrCreateCodeClient } from './client.mjs'
+import { registerCbmTools } from './tools.mjs'
 import { registerSkills } from './skills.mjs'
 
 // --- Core Re-exports ---
@@ -27,13 +23,7 @@ export * from './tools.mjs'
 
 // --- Legacy Bridge Re-exports ---
 export {
-  cbmApply,
-  getOrCreateClient,
-  findExe,
   projectNameFromPath,
-  autoStartCodebaseMemory,
-  createClient,
-  registerCbmTools,
 }
 
 export const name = 'codebase-memory'
@@ -147,7 +137,13 @@ export function apply(ctx, config = {}) {
   const log = loggerOf(ctx)
 
   // 1. Tool registration & auto-start (ctx.tools is guaranteed by inject=['tools'])
-  const toolNames = cbmApply(ctx)
+  const client = getOrCreateCodeClient(config)
+  if (client) {
+    ctx.effect?.(() => () => {
+      client.dispose?.()
+    }, 'codebase-memory: client')
+  }
+  const toolNames = registerCbmTools(ctx, client)
   if (Array.isArray(toolNames) && toolNames.length) {
     log.info(`[codebase-memory] registered tools: ${toolNames.join(', ')}`)
   }
