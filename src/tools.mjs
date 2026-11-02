@@ -160,7 +160,7 @@ export function createCbmToolDefinitions(runtime = {}) {
         const cwd = getCwd(exec)
         const targetRepo = args?.repo || cwd
         const engine = getEngine(exec)
-        return await engine.searchGraph(targetRepo, args)
+        return await engine.searchSymbols(targetRepo, args)
       },
       presentCall: (args) => ({ card: 'generic', title: 'Code Search', kind: 'read', rawInput: args?.name_pattern || args?.file_path_pattern || 'all' }),
     },
@@ -255,7 +255,7 @@ export function createCbmToolDefinitions(runtime = {}) {
         },
         render: (_args, value) => {
           if (value?.degraded) return textBlocks(`Code Intelligence Degraded: ${value?.message || 'Service unavailable'}`)
-          return textBlocks(value?.raw || (value?.ok ? 'No architecture data found.' : value?.message || 'Architecture query failed.'))
+          return textBlocks(value?.overview || value?.raw || (value?.ok ? 'No architectural summary available.' : value?.message || 'Arch query failed.'))
         },
       },
       async execute(args, exec) {
@@ -264,7 +264,7 @@ export function createCbmToolDefinitions(runtime = {}) {
         const engine = getEngine(exec)
         return await engine.getArchitecture(targetRepo, args)
       },
-      presentCall: (args) => ({ card: 'generic', title: 'Code Architecture', kind: 'read', rawInput: args?.directory || '.' }),
+      presentCall: (args) => ({ card: 'generic', title: 'Architecture Summary', kind: 'read', rawInput: args?.directory || '' }),
     },
     {
       name: 'cbm_search_code',
@@ -284,12 +284,12 @@ export function createCbmToolDefinitions(runtime = {}) {
             ok: { type: 'boolean' },
             degraded: { type: 'boolean' },
             message: { type: 'string' },
-            raw: { type: 'string' },
+            results: { type: 'string' },
           },
         },
         render: (_args, value) => {
           if (value?.degraded) return textBlocks(`Code Intelligence Degraded: ${value?.message || 'Service unavailable'}`)
-          return textBlocks(value?.raw || (value?.ok ? 'No matches found.' : value?.message || 'Search code failed.'))
+          return textBlocks(value?.results || (value?.ok ? 'No matches found.' : value?.message || 'Search failed.'))
         },
       },
       async execute(args, exec) {
