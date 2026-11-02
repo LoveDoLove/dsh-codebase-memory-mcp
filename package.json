@@ -7,6 +7,12 @@
   "exports": {
     ".": "./src/index.mjs",
     "./bridge": "./src/bridge.mjs",
+    "./client": "./src/client.mjs",
+    "./discovery": "./src/discovery.mjs",
+    "./engine": "./src/engine.mjs",
+    "./tools": "./src/tools.mjs",
+    "./types": "./src/types.mjs",
+    "./watcher": "./src/watcher.mjs",
     "./package.json": "./package.json"
   },
   "files": [

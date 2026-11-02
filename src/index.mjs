@@ -1,3 +1,10 @@
+/**
+ * Codebase Memory (CBM) MCP Plugin & Library.
+ *
+ * Provides AST-level structural code intelligence, call hierarchies,
+ * symbol indexing, textual search, and knowledge graph navigation.
+ */
+
 import {
   cbmApply,
   getOrCreateClient,
@@ -6,11 +13,31 @@ import {
   autoStartCodebaseMemory,
   createClient,
   registerCbmTools,
-} from './bridge.mjs';
-import { registerSkills } from './skills.mjs';
+} from './bridge.mjs'
+import { registerSkills } from './skills.mjs'
 
-export const name = 'codebase-memory';
-export const inject = ['tools'];
+// --- Core Re-exports ---
+export * from './types.mjs'
+export * from './redact.mjs'
+export * from './discovery.mjs'
+export * from './client.mjs'
+export * from './engine.mjs'
+export * from './watcher.mjs'
+export * from './tools.mjs'
+
+// --- Legacy Bridge Re-exports ---
+export {
+  cbmApply,
+  getOrCreateClient,
+  findExe,
+  projectNameFromPath,
+  autoStartCodebaseMemory,
+  createClient,
+  registerCbmTools,
+}
+
+export const name = 'codebase-memory'
+export const inject = ['tools']
 
 export const GUIDANCE_TEXT = `## Codebase Memory — Knowledge Graph Policy
 Codebase Memory provides structural code intelligence and AST-level call-graph navigation.
@@ -28,19 +55,19 @@ Workflow:
 1. Identify the indexed project: call \`cbm_projects()\`. By default tools infer project from workspace.
 2. Search symbols: \`cbm_search(name_pattern="...")\` to find exact symbol names.
 3. Trace dependencies: \`cbm_trace(symbol="...", direction="inbound"|"outbound"|"both")\` to trace call graphs.
-4. Inspect definition: \`cbm_snippet(qualified_name="...")\` to inspect code without loading entire files.`;
+4. Inspect definition: \`cbm_snippet(qualified_name="...")\` to inspect code without loading entire files.`
 
 function loggerOf(ctx) {
-  const log = ctx.logger ? ctx.logger('codebase-memory') : console;
+  const log = ctx.logger ? ctx.logger('codebase-memory') : console
   return {
-    info: (...args) => { try { log.info(...args); } catch { /* ignore */ } },
-    warn: (...args) => { try { log.warn(...args); } catch { /* ignore */ } },
-    debug: (...args) => { try { log.debug?.(...args); } catch { /* ignore */ } },
-  };
+    info: (...args) => { try { log.info(...args) } catch { /* ignore */ } },
+    warn: (...args) => { try { log.warn(...args) } catch { /* ignore */ } },
+    debug: (...args) => { try { log.debug?.(...args) } catch { /* ignore */ } },
+  }
 }
 
 export function registerSystemPromptGuidance(scope, log) {
-  if (!scope?.systemPrompt || typeof scope.systemPrompt.section !== 'function') return false;
+  if (!scope?.systemPrompt || typeof scope.systemPrompt.section !== 'function') return false
   try {
     scope.effect(
       () => scope.systemPrompt.section({
@@ -49,35 +76,46 @@ export function registerSystemPromptGuidance(scope, log) {
         text: GUIDANCE_TEXT,
       }),
       'codebase-memory: guidance',
-    );
-    log?.info('[codebase-memory] registered system prompt guidance');
-    return true;
+    )
+    log?.info?.('[codebase-memory] registered system prompt guidance')
+    return true
   } catch (err) {
-    log?.warn(`[codebase-memory] systemPrompt.section failed: ${err instanceof Error ? err.message : String(err)}`);
-    return false;
+    log?.warn?.(`[codebase-memory] systemPrompt.section failed: ${err instanceof Error ? err.message : String(err)}`)
+    return false
   }
 }
 
 export function registerSlashCommands(scope, log) {
-  if (!scope?.commands || typeof scope.commands.register !== 'function') return false;
+  if (!scope?.commands || typeof scope.commands.register !== 'function') return false
   try {
     scope.effect(() => scope.commands.register({
       name: 'cbm',
       description: 'Show codebase-memory status and Web UI link (http://localhost:9749/)',
       handler: async () => {
-        const exe = findExe();
+        const exe = findExe()
         if (!exe) {
           return {
             kind: 'success',
             text: '⚠️  codebase-memory-mcp executable not found. Install codebase-memory-mcp or set CBM_EXE.',
-          };
+          }
         }
-        const client = getOrCreateClient();
-        let projectList = '';
+        const client = getOrCreateClient()
+        let projectList = ''
         try {
-          if (client) projectList = await client.call('list_projects', {});
+          if (client) {
+            const res = await client.listProjects?.() || await client.call?.('list_projects', {})
+            if (typeof res === 'string') {
+              projectList = res
+            } else if (res?.raw) {
+              projectList = res.raw
+            } else if (res?.projects) {
+              projectList = res.projects.join('\n')
+            } else if (Array.isArray(res?.content)) {
+              projectList = res.content.map((c) => c.text || '').join('\n')
+            }
+          }
         } catch (e) {
-          projectList = `Error querying projects: ${e.message}`;
+          projectList = `Error querying projects: ${e.message}`
         }
         return {
           kind: 'success',
@@ -91,12 +129,12 @@ export function registerSlashCommands(scope, log) {
             projectList.trim() || 'No projects indexed yet.',
             '```',
           ].join('\n'),
-        };
+        }
       },
-    }), 'codebase-memory: slash-commands');
-    return true;
+    }), 'codebase-memory: slash-commands')
+    return true
   } catch {
-    return false;
+    return false
   }
 }
 
@@ -106,20 +144,20 @@ export function registerSlashCommands(scope, log) {
  * @param {object} [config] Plugin options
  */
 export function apply(ctx, config = {}) {
-  const log = loggerOf(ctx);
+  const log = loggerOf(ctx)
 
   // 1. Tool registration & auto-start (ctx.tools is guaranteed by inject=['tools'])
-  const toolNames = cbmApply(ctx);
+  const toolNames = cbmApply(ctx)
   if (Array.isArray(toolNames) && toolNames.length) {
-    log.info(`[codebase-memory] registered tools: ${toolNames.join(', ')}`);
+    log.info(`[codebase-memory] registered tools: ${toolNames.join(', ')}`)
   }
 
   // 2. System prompt — must use ctx.inject(), never direct property access
   if (typeof ctx.inject === 'function') {
     try {
       ctx.inject(['systemPrompt'], (scope) => {
-        registerSystemPromptGuidance(scope, log);
-      });
+        registerSystemPromptGuidance(scope, log)
+      })
     } catch {
       // systemPrompt service not available; skip
     }
@@ -130,11 +168,11 @@ export function apply(ctx, config = {}) {
     try {
       ctx.inject(['skills'], (scope) => {
         void registerSkills(scope, log).then((names) => {
-          if (names.length) log.info(`[codebase-memory] registered skill: ${names.join(', ')}`);
+          if (names.length) log.info(`[codebase-memory] registered skill: ${names.join(', ')}`)
         }).catch((err) => {
-          log.warn(`[codebase-memory] skill register failed: ${err instanceof Error ? err.message : String(err)}`);
-        });
-      });
+          log.warn(`[codebase-memory] skill register failed: ${err instanceof Error ? err.message : String(err)}`)
+        })
+      })
     } catch {
       // skills service not available; skip
     }
@@ -145,23 +183,13 @@ export function apply(ctx, config = {}) {
     try {
       ctx.inject(['commands'], (scope) => {
         if (registerSlashCommands(scope, log)) {
-          log.info('[codebase-memory] registered /cbm command');
+          log.info('[codebase-memory] registered /cbm command')
         }
-      });
+      })
     } catch {
       // commands service not available; skip
     }
   }
 }
 
-export default { name, inject, apply };
-
-export {
-  cbmApply,
-  getOrCreateClient,
-  findExe,
-  projectNameFromPath,
-  autoStartCodebaseMemory,
-  createClient,
-  registerCbmTools,
-};
+export default { name, inject, apply }
