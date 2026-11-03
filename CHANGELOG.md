@@ -8,9 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.5] - 2026-11-02
 
 ### Added
-- Complete Codebase Memory core extracted from Veyra:
+- Complete Codebase Memory core implemented in this standalone package:
   - `src/types.mjs`: constants for indexing, freshness, entities, relations, directions.
-  - `src/client.mjs`: stdio JSON-RPC client, executable discovery, and daemon auto-start.
+  - `src/client.mjs`: stdio JSON-RPC client, executable discovery, and daemon lifecycle management.
   - `src/discovery.mjs`: path traversal protection, gitignore parser, sensitive/secret detection, and repo discovery.
   - `src/engine.mjs`: `CodeIntelligenceEngine` for indexing, search, snippet extraction, architecture, and status.
   - `src/watcher.mjs`: `RepositoryWatcher` for debounced incremental file watching.
@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Standalone DSH plugin for `codebase-memory-mcp` integration.
-- Background daemon auto-start on plugin initialization (`--ui=true`).
+- Background daemon lifecycle management with the `--ui=true` Web UI (started lazily on first request).
 - Web knowledge graph visualization UI hosted at `http://localhost:9749/`.
 - Full set of 6 MCP tools registered into DSH:
   - `cbm_projects`: List indexed projects.

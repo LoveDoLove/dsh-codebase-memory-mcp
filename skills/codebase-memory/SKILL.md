@@ -12,84 +12,105 @@ whenToUse: >
 
 # Codebase Memory — Structural Code Intelligence
 
-Codebase Memory provides structural AST-level code intelligence and call-graph navigation,
-integrated natively into Veyra alongside engineering memory.
+Codebase Memory provides structural AST-level code intelligence and call-graph
+navigation from an existing codebase-memory-mcp index.
 
 Web visual graph interface: http://localhost:9749/
+
+The daemon starts lazily on the first tool call. The six tools always exist; if
+the `codebase-memory-mcp` executable is missing, calls return a degraded result.
 
 ## Quick Decision Matrix
 
 | Question | Tool call |
 |----------|----------|
-| Who calls X? | `cbm_trace(direction="inbound")` |
-| What does X call? | `cbm_trace(direction="outbound")` |
-| Full call context | `cbm_trace(direction="both")` |
+| Who calls X? | `cbm_trace(symbol="X", direction="inbound")` |
+| What does X call? | `cbm_trace(symbol="X", direction="outbound")` |
+| Full call context | `cbm_trace(symbol="X", direction="both")` |
 | Find by name pattern | `cbm_search(name_pattern="...")` |
-| Impact of local changes | `cbm_trace` (impact) + `veyra_code_status` (freshness) |
-| Text search | `cbm_search_code` or grep |
+| Read source snippet | `cbm_snippet(qualified_name="...")` |
+| Directory architecture | `cbm_arch(directory="src")` |
+| Text search in repo | `cbm_search_code(query="...")` |
+| List indexed projects | `cbm_projects(reason="...")` |
 
 ## Exploration Workflow
 
-1. `cbm_projects` — pick the project whose `root_path` contains your working directory; pass its `name` (or the absolute directory itself) as `project`, never a repo or folder name.
-2. `cbm_arch` — understand directory component dependencies and architecture overview.
-3. `cbm_search(label="Function", name_pattern=".*Pattern.*")` — find code.
-4. `cbm_snippet(qualified_name="...")` — read exact symbol definitions with minimal token overhead.
+1. `cbm_projects(reason="...")` — list indexed projects. Use a returned project
+   name as `project`, or pass the repository root as `repo`; tools otherwise
+   infer the project from the working directory.
+2. `cbm_arch(directory="src")` — understand directory component dependencies
+   and the architecture overview.
+3. `cbm_search(name_pattern=".*Pattern.*", label="Function")` — find symbols.
+4. `cbm_snippet(qualified_name="...")` — read exact symbol definitions with
+   minimal token overhead.
 
 ## Tracing Workflow
 
-1. `cbm_search(name_pattern=".*FuncName.*")` — discover exact name.
-2. `cbm_trace(function_name="FuncName", direction="both", depth=3)` — trace call hierarchies.
+1. `cbm_search(name_pattern=".*FuncName.*")` — discover the exact symbol name.
+2. `cbm_trace(symbol="FuncName", direction="both", max_depth=3)` — trace call
+   hierarchies. `direction` is `inbound`, `outbound`, or `both`.
 
 ## Tools
 
 - `cbm_projects`: List all projects currently indexed in codebase-memory-mcp.
-- `cbm_search`: Discover functions, classes, interfaces, or files by name pattern, AST label, or file path pattern.
-- `cbm_snippet`: Retrieve exact symbol definitions and their immediate context with minimal token overhead without reading whole files.
-- `cbm_trace`: Trace inbound/outbound call paths through the knowledge graph from a specific symbol.
+  Requires `reason`, a short explanation for the tool call.
+- `cbm_search`: Discover functions, classes, interfaces, or files by name
+  pattern, AST label, or file path pattern. Optional `limit` defaults to 50.
+- `cbm_snippet`: Retrieve exact symbol definitions and their immediate context
+  without reading whole files.
+- `cbm_trace`: Trace inbound/outbound call paths through the knowledge graph
+  from a specific symbol.
 - `cbm_arch`: Directory-level component dependency and architectural overview.
 - `cbm_search_code`: Fast regex search across indexed repository files.
-- `veyra_code_status`: Check indexing status, freshness of evidence anchors, and affected memories.
 
-## Evidence Tiers
+Most tools accept `project` (explicit project slug) and `repo` (repository root
+path, slugified automatically). Resolution order is explicit `project`, then the
+slug of `repo`, then the slug of the working directory.
 
-- **Scout (Tier 1):** fast positive lookup with few graph calls and targeted source checks. Treat results as provisional; never make absence, exhaustive, dead-code, or complete-impact claims.
-- **Verify (Tier 2, default):** task-directed searches, relevant trace directions, exact snippets for material claims, and all relevant result pages.
-- **Auditor (Tier 3):** bounded-scope full verification with a current graph generation, complete relevant pagination, both call directions and broader relationships when material, plus explicit unresolved limitations.
-- **Every tier:** after candidate paths are known, call `veyra_code_status` for freshness. For negative or exhaustive claims also inspect the relevant scopes. A clean result means no recorded gap, not proof of completeness. For partial, skipped, excluded, stale, pending, or unknown coverage, read/grep the reported ranges or scope before relying on the graph.
+## Result Quality
 
-## Sessions and Subagents
+- Graph results are structural but can be stale if the index has not been
+  refreshed. Verify material claims with `cbm_snippet` or by reading the source.
+- The six tools do not expose pagination, generation, freshness, or coverage
+  metadata. Do not claim that a result set is exhaustive, that a symbol has no
+  callers, or that a path is dead code based only on one graph query.
+- For negative or exhaustive claims, run the relevant trace directions, inspect
+  the candidate files, and state any remaining uncertainty.
+- `cbm_search_code` searches indexed files; generated, vendored, binary, and
+  sensitive files may be excluded by repository discovery rules.
 
-- At session start or after compaction, confirm the nearest graph project and generation with `cbm_projects` / `veyra_code_status`, then choose Scout, Verify, or Auditor for the task.
-- Before delegating, query the graph and coverage in the parent. Pass the tier, project, generation/freshness, bounded scope, queries and pagination state, qualified symbols, paths, call-chain findings, coverage evidence with ranges/reasons, source fallback already performed, and unresolved questions to the child.
-- A child without MCP tools must not call or claim MCP access. It should work from the supplied evidence and use read/grep on exact source, especially every reported missed-coverage range.
+## When to Use Codebase Memory vs grep
 
-## Quality Analysis
+- Use `cbm_trace` for caller/callee relationships, call hierarchies, and
+  blast-radius analysis.
+- Use `cbm_search` to discover functions, classes, interfaces, or files by name
+  pattern or AST label.
+- Use `cbm_snippet` for exact definitions and immediate context.
+- Use `cbm_arch` for directory-level component dependencies.
+- Use `grep`/`read` when editing files, reading non-code assets, or searching
+  exact string literals.
 
-Veyra does not expose degree/relationship filters. Use `cbm_trace(direction="both")` to inspect
-callers and callees of a symbol, and `cbm_search(name_pattern=...)` to locate candidate symbols.
+## Bridge Limitations
 
-## When to use Codebase Memory vs text grep / file tools
+- `cbm_snippet` accepts `end_line` but the current bridge forwards only
+  `qualified_name` and `start_line`; use `start_line` and rely on the daemon's
+  normal snippet context.
+- `cbm_arch` accepts `depth` but the current client forwards only the project
+  and path, so the daemon's default depth is used.
+- Indexing is not exposed as a tool. The plugin only queries an existing index;
+  use the library API or the upstream CLI to build or refresh it.
 
-- **cbm_trace**: Trace caller/callee relationships, call hierarchies, and blast-radius / impact analysis (precise structural graph vs noisy text search).
-- **cbm_search**: Discover functions, classes, interfaces, or files by name pattern or AST label.
-- **cbm_snippet**: Retrieve exact symbol definitions and their immediate context with minimal token overhead without reading whole files.
-- **cbm_arch**: Directory-level component dependency and architectural overview.
-- **cbm_search_code**: Fast regex search across indexed repository files.
-- **veyra_code_status**: Check indexing status, freshness of evidence anchors, and affected memories.
-- **grep / read**: Use when editing files, reading non-code assets, or searching exact string literals.
+## Missing Executable
 
-## Core Rules & Invariants
+If a call reports that Code Intelligence is degraded or the executable is not
+found, install `codebase-memory-mcp` and set `CBM_EXE` (or
+`CODEBASE_MEMORY_EXE`) if it is not on `PATH`. The executable path is resolved
+when the plugin loads, so reload the profile after installing it.
 
-1. **Repository Code is Authoritative**:
-   The current code in the repository is the source of truth. Codebase Memory reflects the structural index of that code.
-2. **Memory is Non-Authoritative**:
-   Veyra engineering memories provide historical context and decisions. If a recalled memory contradicts current code, current repository code always wins.
-3. **Graceful Degradation**:
-   If the structural index is not yet built or unavailable, tools fallback gracefully without failing your workflow.
+## Core Rules
 
-## Gotchas
-
-1. `cbm_search` returns up to `limit` results (default 50) — raise `limit` for broader searches.
-2. `cbm_trace` needs exact names — use `cbm_search(name_pattern=...)` first to discover the exact symbol name.
-3. `cbm_trace(direction="outbound")` misses cross-service callers — use `direction="both"` for full call context.
-5. `veyra_code_status` reports freshness of engineering memory anchors, not graph generation — use `cbm_projects` to confirm the indexed project and generation.
+- Prefer graph tools for structure and `cbm_snippet` for exact code.
+- Do not invent symbol names; search first, then trace or snippet.
+- Do not use the graph as a substitute for reading the code you are about to
+  change.
+- Report degraded results and missing indexes explicitly instead of guessing.
