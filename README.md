@@ -1,9 +1,9 @@
 # @lovedolove/dsh-codebase-memory-mcp
 
 > Standalone **Codebase Memory MCP bridge plugin and library** for DeepSeek
-> Harness (DSH). Registers six knowledge-graph code tools, manages a lazily
-> started `codebase-memory-mcp` daemon with its graph-visualization Web UI, and
-> ships a bundled agent skill plus a `/cbm` status command.
+> Harness (DSH). Registers six knowledge-graph code tools, auto-starts the
+> `codebase-memory-mcp` daemon with its graph-visualization Web UI, and ships a
+> bundled agent skill plus a `/cbm` status command.
 
 [![npm version](https://img.shields.io/npm/v/@lovedolove/dsh-codebase-memory-mcp.svg)](https://www.npmjs.com/package/@lovedolove/dsh-codebase-memory-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -17,11 +17,14 @@
 - **Six knowledge-graph code tools** registered on the DSH tool surface:
   `cbm_projects`, `cbm_search`, `cbm_snippet`, `cbm_arch`, `cbm_trace`, and
   `cbm_search_code`.
-- **Lazy daemon and Web UI** — the plugin does not start the daemon while it is
-  loading. The shared client spawns `codebase-memory-mcp --ui=true --port=9749`
-  as a child process over stdio JSON-RPC 2.0 the first time a tool call or
-  `/cbm` needs it. If the child exits, the next request starts it again; the
-  client disposes it when the plugin shuts down.
+- **Auto-started daemon and Web UI** — when the plugin loads, it spawns
+  `codebase-memory-mcp --ui=true --port=9749` as a child process over stdio
+  JSON-RPC 2.0 and prints the UI URL, so http://localhost:9749/ is live as soon
+  as `dsh web` is up. A missing or broken binary only warns; it never blocks
+  plugin load, and any later tool call retries. If the child exits, the next
+  request starts it again; the client disposes it when the plugin shuts down.
+  Pass `eagerStart: false` as plugin config, or run under `node --test`, to keep
+  the daemon down until the first call.
 - **System-prompt guidance** — injects a *Codebase Memory — Knowledge Graph
   Policy* section that tells the model when to prefer the graph tools over
   `grep`/`read`.
@@ -133,10 +136,8 @@ On plugin load you will see the tool registration log:
 [codebase-memory] registered skill: codebase-memory
 ```
 
-The daemon and its Web UI are **not** started at this point. They start on the
-first tool call or when `/cbm` runs. The plugin itself does not print a UI
-banner; the optional `autoStartCodebaseMemory()` helper (used by the legacy
-bridge) logs:
+The daemon starts during the same load, so http://localhost:9749/ is already
+serving. The autostart logs:
 
 ```text
 [codebase-memory] 🔍 codebase-memory UI is live: http://localhost:9749/
@@ -258,9 +259,10 @@ drive prefix, e.g. `C:\Users\me\app` → `C-Users-me-app`.
 
 ### Daemon lifecycle
 
-The client starts the daemon lazily on the first RPC (`ensureStarted`), not when
-the plugin applies. Every tool call ensures the child is running, so the next
-call starts it again if it has died. On plugin disposal the client is disposed,
+The plugin applies `cbmApply()`, which starts the daemon eagerly at load unless
+`eagerStart: false` or the process is a test runner. The client also starts it on
+demand (`ensureStarted`) on the first RPC, so a call works even when the eager
+start was skipped or the child died. On plugin disposal the client is disposed,
 which kills the daemon and rejects any pending requests. The client also exposes
 `uiEnabled: false` for headless library use (`--ui=false`).
 
@@ -396,7 +398,7 @@ exists on npm, the workflow bumps the patch version, commits the bump with
 |---------|-----|
 | `codebase-memory-mcp executable not found` | Install the executable, set `CBM_EXE` (or `CODEBASE_MEMORY_EXE`), and reload the DSH profile. |
 | Tools return `Code Intelligence Degraded` | The binary is missing or failed to start. Check the path and run `codebase-memory-mcp --version`. |
-| Web UI is not reachable | The daemon starts lazily. Call a `cbm_*` tool or `/cbm` first, then open http://localhost:9749/. |
+| Web UI is not reachable | The daemon starts at plugin load. Check the DSH log for `codebase-memory-mcp failed to start`, then open http://localhost:9749/. Calling a `cbm_*` tool or `/cbm` retries the start. |
 | Project not found / empty results | Confirm the repository is indexed (`cbm_projects(reason="...")`) and pass the correct `project` slug or `repo` path. |
 | No symbols after indexing | The plugin does not index automatically; build the index through the library API or the upstream CLI. |
 

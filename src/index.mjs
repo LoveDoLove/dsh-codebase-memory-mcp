@@ -8,7 +8,7 @@
 import {
   projectNameFromPath,
 } from './bridge.mjs'
-import { getOrCreateCodeClient } from './client.mjs'
+import { cbmApply, findExe, getOrCreateClient } from './client.mjs'
 import { registerCbmTools } from './tools.mjs'
 import { registerSkills } from './skills.mjs'
 
@@ -136,13 +136,10 @@ export function registerSlashCommands(scope, log) {
 export function apply(ctx, config = {}) {
   const log = loggerOf(ctx)
 
-  // 1. Tool registration & auto-start (ctx.tools is guaranteed by inject=['tools'])
-  const client = getOrCreateCodeClient(config)
-  if (client) {
-    ctx.effect?.(() => () => {
-      client.dispose?.()
-    }, 'codebase-memory: client')
-  }
+  // 1. Client lifecycle, eager daemon start, and tool registration.
+  //    cbmApply owns the dispose effect and the auto-start; the 0.1.5 rewrite
+  //    called getOrCreateCodeClient() directly and lost the start().
+  const client = cbmApply(ctx, config)
   const toolNames = registerCbmTools(ctx, client)
   if (Array.isArray(toolNames) && toolNames.length) {
     log.info(`[codebase-memory] registered tools: ${toolNames.join(', ')}`)
