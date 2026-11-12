@@ -2,7 +2,7 @@
 
 ## A whitepaper on structural code intelligence for coding agents
 
-Version 0.1.9 · November 2026 · MIT licensed
+Version 0.1.10 · November 2026 · MIT licensed
 
 ---
 
