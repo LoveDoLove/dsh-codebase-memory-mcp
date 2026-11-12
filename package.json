@@ -18,9 +18,13 @@
   "files": [
     "src",
     "skills",
+    "docs",
     "cordis.patch.yml",
     "LICENSE",
     "README.md",
+    "README.zh-CN.md",
+    "WHITEPAPER.md",
+    "AGENTS.md",
     "CHANGELOG.md"
   ],
   "dsh": {
