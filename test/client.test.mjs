@@ -37,16 +37,17 @@ test('createClient and getOrCreateCodeClient export matches expected contract', 
   assert.equal(typeof client.isRunning, 'function')
 })
 
-test('autoStartCodebaseMemory skips cleanly when executable is missing', async () => {
+test('autoStartCodebaseMemory warns when executable is missing', async () => {
   const client = new CodebaseMemoryClient({ exePath: '/nonexistent/cbm' })
-  let warned = false
+  const warnings = []
   const log = {
     info: () => {},
-    warn: () => { warned = true },
+    warn: (msg) => { warnings.push(msg) },
   }
   const result = autoStartCodebaseMemory(client, log)
   assert.equal(result, null)
-  assert.equal(warned, false)
+  assert.equal(warnings.length, 1, 'silence is indistinguishable from "no daemon was ever needed"')
+  assert.match(warnings[0], /executable not found/)
 })
 
 test('autoStartCodebaseMemory logs live UI URL on successful startup', async () => {

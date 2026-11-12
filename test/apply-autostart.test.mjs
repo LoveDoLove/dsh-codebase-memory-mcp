@@ -84,3 +84,52 @@ test('plugin apply auto-starts the daemon with the graph UI enabled', async () =
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+// `dsh web` boots with a Cordis ctx.logger whose exporters never reach the
+// terminal: the only exporter DSH installs on a web boot collects warn/error
+// for the startup-error report. A banner sent through ctx.logger is therefore
+// invisible, which is why the daemon could be up while the user saw nothing.
+// The startup notice must reach a real stream, and it must be stderr because
+// ACP profiles frame their protocol on stdout.
+function captureStderr() {
+  const chunks = []
+  const original = process.stderr.write
+  process.stderr.write = (chunk, ...rest) => {
+    chunks.push(String(chunk))
+    return original.call(process.stderr, chunk, ...rest)
+  }
+  return {
+    text: () => chunks.join(''),
+    restore: () => { process.stderr.write = original },
+  }
+}
+
+test('apply() announces the daemon on stderr, not only through ctx.logger', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'cbm-announce-'))
+  const exe = join(dir, 'codebase-memory-mcp')
+  const marker = join(dir, 'spawned.txt')
+  writeFileSync(exe, fakeMcpServer(marker))
+  execSync(`chmod +x "${exe}"`)
+
+  const prevExe = process.env.CBM_EXE
+  process.env.CBM_EXE = exe
+  resetSharedCodeClient()
+  const stderr = captureStderr()
+
+  try {
+    apply(mockCtx(), { eagerStart: true })
+
+    const announced = await waitFor(() => /9749/.test(stderr.text()), 10_000)
+    assert.ok(
+      announced,
+      'a user watching `dsh web` must see the daemon start; ctx.logger alone is invisible',
+    )
+    assert.match(stderr.text(), /codebase-memory/, 'the notice must name the plugin')
+  } finally {
+    stderr.restore()
+    resetSharedCodeClient()
+    if (prevExe === undefined) delete process.env.CBM_EXE
+    else process.env.CBM_EXE = prevExe
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
