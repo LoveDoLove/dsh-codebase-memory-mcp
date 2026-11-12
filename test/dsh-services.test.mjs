@@ -47,6 +47,15 @@ async function importDsh(spec) {
   return import(pathToFileURL(entry).href)
 }
 
+// ToolRuntime renders executor-owned prompt sections through the executor of
+// the viewing scope, so assemble() throws ToolExecutorUnavailableError unless
+// one is registered. Mount the real native executor; the tests only read the
+// prompt assembly and never execute a tool.
+async function mountExecutor(ctx) {
+  // The package has no default export; the namespace object carries apply/name.
+  await ctx.plugin(await importDsh('@deepseek-ai/dsh-tool-executor-native'))
+}
+
 const TOOL_NAMES = [
   'cbm_projects',
   'cbm_search',
@@ -69,6 +78,7 @@ test('real dsh-skill service loads /codebase-memory through provider.get', { ski
     // must come first or ctx.tools never appears and apply never runs.
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await mountExecutor(ctx)
     await ctx.plugin(SkillRegistry)
     await ctx.plugin(plugin)
 
@@ -104,6 +114,7 @@ test('real CommandRuntime, SystemPrompt and ToolRuntime accept plugin registrati
   try {
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
+    await mountExecutor(ctx)
     await ctx.plugin(CommandRuntime)
     await ctx.plugin(SkillRegistry)
     await ctx.plugin(plugin)
@@ -150,6 +161,7 @@ test('plugin disposal reverses every registration and resets the shared client',
   const ctx = new Context()
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  await mountExecutor(ctx)
   await ctx.plugin(CommandRuntime)
   await ctx.plugin(SkillRegistry)
   await ctx.plugin(plugin)

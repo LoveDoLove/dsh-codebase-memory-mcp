@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.7] - 2026-11-12
+
+### Fixed
+- `dsh web` (and every other DSH app) starts the `codebase-memory-mcp` daemon at plugin load again. The 0.1.5 extraction rewrite replaced `cbmApply()` with a bare `getOrCreateCodeClient()` call, which only constructed the client and never spawned the process, so the graph UI at `http://localhost:9749/` stayed dark until an agent happened to call a `cbm_*` tool.
+- `/cbm` no longer throws `ReferenceError: findExe is not defined`. The handler referenced `findExe()` and `getOrCreateClient()` without importing them.
+- `test/dsh-services.test.mjs` mounts the real native tool executor, so prompt assembly no longer fails with `ToolExecutorUnavailableError` on the host stack.
+
+### Added
+- `test/apply-autostart.test.mjs` pins the regression: `apply()` must spawn the daemon with `--ui=true --port=9749`.
+
 ## [0.1.5] - 2026-11-02
 
 ### Added
