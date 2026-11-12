@@ -157,6 +157,7 @@ The plugin declares five optional peers: `@deepseek-ai/cordis` at `>=4.0.1-rc.1 
 | [Library API](docs/library-api.md) | Reference | You are driving the engine yourself |
 | [Troubleshooting](docs/troubleshooting.md) | How-to | Something does not work |
 | [Whitepaper](WHITEPAPER.md) | Explanation | You want the design argument and the evidence |
+| [Whitepaper (中文)](WHITEPAPER.zh-CN.md) | Explanation | 你要读中文版的设计论证和证据 |
 | [AGENTS.md](AGENTS.md) | Reference | You are an agent working in this repo |
 
 ## Development

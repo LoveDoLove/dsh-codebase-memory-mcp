@@ -20,7 +20,7 @@ It does not parse code. All parsing and indexing happens in the binary. This pac
 | Touch the client, engine, or discovery layer | [docs/architecture.md](docs/architecture.md) |
 | Change an export or a public class | [docs/library-api.md](docs/library-api.md) |
 | Debug something that does not work | [docs/troubleshooting.md](docs/troubleshooting.md) |
-| Understand why the design is like this | [WHITEPAPER.md](WHITEPAPER.md) |
+| Understand why the design is like this | [WHITEPAPER.md](WHITEPAPER.md), [中文](WHITEPAPER.zh-CN.md) |
 
 ## The rules that bite
 

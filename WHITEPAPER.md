@@ -4,6 +4,8 @@
 
 Version 0.1.10 · November 2026 · MIT licensed
 
+[English](WHITEPAPER.md) · [中文](WHITEPAPER.zh-CN.md)
+
 ---
 
 ## Abstract

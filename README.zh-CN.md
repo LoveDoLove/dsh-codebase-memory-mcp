@@ -10,7 +10,7 @@
 [![M8ven Score](https://m8ven.ai/badge/mcp/lovedolove/dsh-codebase-memory-mcp)](https://m8ven.ai/badge/mcp/lovedolove/dsh-codebase-memory-mcp)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-0.2.x-blueviolet?style=flat-square)](https://github.com/deepseek-ai/deepseek-harness)
 
-[English](README.md) · [中文](README.zh-CN.md) · [白皮书](WHITEPAPER.md) · [文档](docs/install.md)
+[English](README.md) · [中文](README.zh-CN.md) · [白皮书](WHITEPAPER.zh-CN.md) · [文档](docs/install.md)
 
 </div>
 
@@ -89,7 +89,7 @@ browser ──▶ http://localhost:9749/ ──▶ graph UI ◀─────�
 2. **引擎**（`src/engine.mjs`）把 DSH 的参数名翻译成上游参数名，守住仓库边界，在二进制缺失时返回降级结果。
 3. **客户端**（`src/client.mjs`）拉起二进制、说 MCP JSON-RPC 2.0、管理进程生命周期。
 
-设计理由见[架构文档](docs/architecture.md)，为什么边界划在这里见[白皮书](WHITEPAPER.md)。
+设计理由见[架构文档](docs/architecture.md)，为什么边界划在这里见[白皮书](WHITEPAPER.zh-CN.md)。
 
 ## 配置
 
@@ -156,7 +156,8 @@ if (result.degraded) {
 | [架构](docs/architecture.md) | 说明 | 你想知道为什么这么设计 |
 | [库接口](docs/library-api.md) | 参考 | 你要自己驱动引擎 |
 | [故障排查](docs/troubleshooting.md) | 操作指南 | 有东西不工作 |
-| [白皮书](WHITEPAPER.md) | 说明 | 你要完整的设计论证和证据 |
+| [白皮书](WHITEPAPER.zh-CN.md) | 说明 | 你要完整的设计论证和证据 |
+| [Whitepaper](WHITEPAPER.md) | Explanation | 你要读英文版的设计论证和证据 |
 | [AGENTS.md](AGENTS.md) | 参考 | 你是在这个仓库里工作的智能体 |
 
 ## 开发

@@ -8,10 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.10] - 2026-11-12
 
 ### Added
-- A documentation set. `README.md` is rewritten in English and `README.zh-CN.md` carries the Chinese version. `WHITEPAPER.md` explains the design and the evidence behind it. `AGENTS.md` indexes the working rules and routes each topic to its own page under `docs/`: `install.md`, `configure.md`, `tools.md`, `architecture.md`, `library-api.md` and `troubleshooting.md`. `CLAUDE.md` points at `AGENTS.md`.
+- A documentation set. `README.md` is rewritten in English and `README.zh-CN.md` carries the Chinese version. `WHITEPAPER.md` explains the design and the evidence behind it, and `WHITEPAPER.zh-CN.md` carries the Chinese version. `AGENTS.md` indexes the working rules and routes each topic to its own page under `docs/`: `install.md`, `configure.md`, `tools.md`, `architecture.md`, `library-api.md` and `troubleshooting.md`. `CLAUDE.md` points at `AGENTS.md`.
 
 ### Fixed
-- The npm tarball now ships `docs/`, `README.zh-CN.md`, `WHITEPAPER.md` and `AGENTS.md`. Before this every `docs/` link in the README resolved to nothing on npmjs.com, and the Chinese README, the whitepaper and the agent notes were absent from the package entirely.
+- The npm tarball now ships `docs/`, `README.zh-CN.md`, `WHITEPAPER.md`, `WHITEPAPER.zh-CN.md` and `AGENTS.md`. Before this every `docs/` link in the README resolved to nothing on npmjs.com, and the Chinese README, both whitepapers and the agent notes were absent from the package entirely.
 
 ### Changed
 - The source comments and the bundled skill text no longer mention the project's former name. The JSON-RPC `clientInfo` name is `codebase-memory`, and the index metadata comment names `$DSH_HOME/codebase-memory/projects/<projectId>/code_index.json`.
