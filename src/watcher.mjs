@@ -1,5 +1,5 @@
 /**
- * Veyra Code Intelligence — Repository Watcher & Incremental Ingestion.
+ * Codebase Memory — Repository Watcher & Incremental Ingestion.
  *
  * Implements Stage 4:
  *   - File system watching with recursive fs.watch

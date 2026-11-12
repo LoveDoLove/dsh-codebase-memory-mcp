@@ -1,11 +1,11 @@
 /**
- * Veyra Code Intelligence — Engine & Lifecycle Controller.
+ * Codebase Memory — Engine & Lifecycle Controller.
  *
  * Coordinates:
  *   - Index lifecycle (not_indexed -> indexing -> ready -> updating -> degraded/error)
  *   - Upstream client queries (search_graph, trace_path, get_code_snippet, get_architecture, search_code)
  *   - Secret scrubbing and repository boundary checks on all query outputs
- *   - Index status metadata persistence in $DSH_HOME/veyra/projects/<projectId>/code_index.json
+ *   - Index status metadata persistence in $DSH_HOME/codebase-memory/projects/<projectId>/code_index.json
  *   - Safe error handling (fail-closed, degraded mode)
  */
 
