@@ -1,6 +1,6 @@
 {
   "name": "@lovedolove/dsh-codebase-memory-mcp",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "Codebase Memory MCP bridge plugin for DeepSeek Harness: knowledge-graph code search, snippets, architecture, call-path tracing, and auto-started graph visualization UI.",
   "type": "module",
   "main": "src/index.mjs",
@@ -18,9 +18,14 @@
   "files": [
     "src",
     "skills",
+    "docs",
     "cordis.patch.yml",
     "LICENSE",
     "README.md",
+    "README.zh-CN.md",
+    "WHITEPAPER.md",
+    "WHITEPAPER.zh-CN.md",
+    "AGENTS.md",
     "CHANGELOG.md"
   ],
   "dsh": {

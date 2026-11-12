@@ -1,441 +1,187 @@
-# @lovedolove/dsh-codebase-memory-mcp
+<div align="center">
 
-> Standalone **Codebase Memory MCP bridge plugin and library** for DeepSeek
-> Harness (DSH). Registers six knowledge-graph code tools, auto-starts the
-> `codebase-memory-mcp` daemon with its graph-visualization Web UI, and ships a
-> bundled agent skill plus a `/cbm` status command.
+# Codebase Memory for DeepSeek Harness
 
-[![npm version](https://img.shields.io/npm/v/@lovedolove/dsh-codebase-memory-mcp.svg)](https://www.npmjs.com/package/@lovedolove/dsh-codebase-memory-mcp)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+**Give your agent a map of the codebase instead of a bag of greps.**
+
+[![npm version](https://img.shields.io/npm/v/@lovedolove/dsh-codebase-memory-mcp?style=flat-square&color=blue)](https://www.npmjs.com/package/@lovedolove/dsh-codebase-memory-mcp)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=flat-square)](LICENSE)
 [![CI](https://github.com/LoveDoLove/dsh-codebase-memory-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/LoveDoLove/dsh-codebase-memory-mcp/actions/workflows/ci.yml)
-[![M8ven Score](https://m8ven.ai/badge/mcp/lovedolove/dsh-codebase-memory-mcp)](https://m8ven.ai/mcp/lovedolove/dsh-codebase-memory-mcp?s=readme)
+[![M8ven Score](https://m8ven.ai/badge/mcp/lovedolove/dsh-codebase-memory-mcp)](https://m8ven.ai/badge/mcp/lovedolove/dsh-codebase-memory-mcp)
+[![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-0.2.x-blueviolet?style=flat-square)](https://github.com/deepseek-ai/deepseek-harness)
 
----
+[English](README.md) · [中文](README.zh-CN.md) · [Whitepaper](WHITEPAPER.md) · [Docs](docs/install.md)
 
-## Features
+</div>
 
-- **Six knowledge-graph code tools** registered on the DSH tool surface:
-  `cbm_projects`, `cbm_search`, `cbm_snippet`, `cbm_arch`, `cbm_trace`, and
-  `cbm_search_code`.
-- **Auto-started daemon and Web UI** — when the plugin loads, it spawns
-  `codebase-memory-mcp --ui=true --port=9749` as a child process over stdio
-  JSON-RPC 2.0 and prints the UI URL, so http://localhost:9749/ is live as soon
-  as `dsh web` is up. A missing or broken binary only warns; it never blocks
-  plugin load, and any later tool call retries. If the child exits, the next
-  request starts it again; the client disposes it when the plugin shuts down.
-  Pass `eagerStart: false` as plugin config, or run under `node --test`, to keep
-  the daemon down until the first call.
-- **System-prompt guidance** — injects a *Codebase Memory — Knowledge Graph
-  Policy* section that tells the model when to prefer the graph tools over
-  `grep`/`read`.
-- **Bundled agent skill** — [`skills/codebase-memory/SKILL.md`](skills/codebase-memory/SKILL.md)
-  is registered as a native bundled skill provider (`codebase-memory`, rank 600,
-  model- and user-invocable), so the model-facing `skill` tool can load it.
-- **`/cbm` slash command** — reports the resolved executable path, the Web UI
-  link, and the projects currently indexed in the daemon.
-- **Graceful degradation** — only `tools` is a hard dependency
-  (`inject: ['tools']`); `systemPrompt`, `skills`, and `commands` are attached via
-  deferred `ctx.inject()`, so a missing host service simply skips that feature.
-  The six tools are registered even when the executable is absent; calls return
-  a degraded result instead of failing to load the plugin.
-- **Cross-platform executable detection** — `CBM_EXE` and
-  `CODEBASE_MEMORY_EXE` overrides, user and system directories, current working
-  directory, `PATH`, and a WSL interop fallback that locates
-  `codebase-memory-mcp.exe` reachable from Linux/WSL.
-- **Reusable library API** — the package exports the MCP client, indexing engine,
-  repository discovery, sanitization, watcher, tool definitions, and type
-  constants, so the bridge can be used without the DSH plugin layer.
+![The graph UI showing a repository atlas](docs/assets/graph-ui.png)
 
----
+## The problem
 
-## Requirements
+`grep` finds text. It does not know that `Object.handler` is called by three tools, that `apply` is the entry point, or that `src/engine.mjs` is imported by `src/index.mjs` and nothing else. Every time your agent needs to answer "who calls this", it greps, reads five files, and guesses.
 
-| Component | Version |
-|-----------|---------|
-| DeepSeek Harness | `>=0.1.2-rc.1 <0.3.0-0` (`dsh.compatibility.dshVersions`) |
-| Node.js | `>=18 <25` (`engines`) |
-| `codebase-memory-mcp` executable | any recent release |
+This plugin gives DeepSeek Harness a real code graph. It bridges to [`codebase-memory-mcp`](https://github.com/DeusData/codebase-memory-mcp), keeps the daemon running, and registers six tools that answer structural questions directly. The agent asks once and gets the call chain.
 
-Optional peer dependencies (declared in `peerDependencies`, resolved from the DSH
-runtime when present): `@deepseek-ai/cordis` `>=4.0.1-rc.1 <5.0.0-0`, and
-`@deepseek-ai/dsh-commands`, `@deepseek-ai/dsh-skill`,
-`@deepseek-ai/dsh-system-prompt`, `@deepseek-ai/dsh-tools` `>=0.1.2-rc.1 <0.3.0-0`.
+## Quick start
 
-> **The executable is required for queries, not for loading the plugin.** The
-> plugin registers the `cbm_*` tools at load time. If no executable is found,
-> tool calls return a degraded result and `/cbm` prints an installation hint.
-> The executable path is resolved when the shared client is constructed, so after
-> installing the binary you must reload the DSH profile for the plugin to find it.
-
----
-
-## Installation
-
-### 1. Install the `codebase-memory-mcp` executable
-
-The plugin is only a bridge — code indexing and querying are done by the
-`codebase-memory-mcp` runtime ([upstream project](https://github.com/DeusData/codebase-memory-mcp),
-[documentation](https://deusdata.github.io/codebase-memory-mcp/)):
-
-```bash
-# Installs the CLI and downloads/caches the native runtime for your platform
-npm install -g codebase-memory-mcp
-
-# Verify it runs
-codebase-memory-mcp --version
-```
-
-Alternatively, download your platform's release binary and place it in one of
-the locations the plugin searches:
-
-- `~/.local/bin/codebase-memory-mcp` (Linux/macOS user bin)
-- `/usr/local/bin/` or `/usr/bin/` (system directories)
-- the current working directory, or anywhere on `PATH`
-- `%USERPROFILE%\AppData\Local\Programs\codebase-memory-mcp\codebase-memory-mcp.exe` (Windows)
-
-Or point the plugin at it explicitly with `CBM_EXE=/path/to/codebase-memory-mcp`
-(or `CODEBASE_MEMORY_EXE`).
-
-### 2. Install the plugin into a DSH profile
-
-```bash
+```sh
+# 1. Install the plugin into your DSH profile
 dsh plugin --profile web add @lovedolove/dsh-codebase-memory-mcp
+
+# 2. Make sure the binary is on your PATH (or set CBM_EXE)
+codebase-memory-mcp --version
+
+# 3. Start the harness. The daemon starts with it.
+dsh web
 ```
 
-(replace `web` with your profile name — `web`, `headless`, `sdk`, `acp`, …)
+On startup you should see this on stderr:
 
-This forwards the package install into the profile directory. Because the
-package declares `dsh.bundle.patch`, DSH automatically **activates the bundle**
-by appending `@lovedolove/dsh-codebase-memory-mcp` to the profile's
-`dsh.profile.bundles` list.
-
-Other ways to install:
-
-- **Web sidebar → Plugins page**: search for the package and install it there
-  (the `plugin_manager` tool exposes the same operations in Creator mode).
-- **Manual wiring**: add the package to the profile's `dependencies` in
-  `$DSH_HOME/profiles/<name>/package.json` **and** list it under
-  `dsh.profile.bundles`, then run a package install in that directory. The
-  shipped bundle patch ([`cordis.patch.yml`](cordis.patch.yml), declared as
-  `dsh.bundle.patch`) then mounts the plugin:
-
-  ```yaml
-  - insert:
-      - id: codebase-memory
-        name: '@lovedolove/dsh-codebase-memory-mcp'
-  ```
-
-### 3. Start DSH
-
-On plugin load the daemon starts, and the startup notice goes to **stderr**:
-
-```text
+```
 [codebase-memory] 🔍 codebase-memory UI is live: http://localhost:9749/
 ```
 
-That line is the signal that autostart worked. If the executable cannot be
-found, the same channel prints:
+Open <http://localhost:9749/> in a browser and the graph UI is already waiting. Build an index once, then ask the agent about any symbol.
 
-```text
-[codebase-memory] codebase-memory-mcp executable not found; the graph UI stays off. Install codebase-memory-mcp or set CBM_EXE.
+```sh
+# Index a repository (the tools do not index on their own)
+codebase-memory-mcp cli --quiet index_repository '{"repo_path":"/absolute/path/to/repo"}'
 ```
 
-Both go to stderr rather than stdout because ACP profiles frame their protocol
-on stdout, and rather than `ctx.logger` because a `dsh web` boot installs no
-console exporter on the logger, so anything sent there stays in the in-memory
-buffer and never reaches the terminal. Interleaved diagnostic logs such as
-`[codebase-memory] registered tools: ...` still go through `ctx.logger` and are
-readable from the DSH log view, not the terminal.
+Then just ask, or call a tool directly:
 
-Check the daemon directly at any time:
-
-```bash
-curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:9749/
-# 200 = the graph UI is up
+```ts
+cbm_search   { name_pattern: ".*Handler.*" }
+cbm_trace    { symbol: "Object.handler", direction: "inbound" }
+cbm_snippet  { qualified_name: "app.auth.login" }
 ```
 
----
+## What you get
 
-## Usage
+| Tool | Answers |
+| --- | --- |
+| `cbm_projects` | What has been indexed, and how fresh is it |
+| `cbm_search` | Which symbols match a name, label, or path pattern |
+| `cbm_trace` | Who calls this, or what this calls, to a chosen depth |
+| `cbm_snippet` | The exact source of one symbol |
+| `cbm_arch` | How a directory is structured and what depends on what |
+| `cbm_search_code` | A text search for literals, errors, and config values |
 
-### Let the agent use it
+Above the tools, the plugin also gives you:
 
-The plugin injects the knowledge-graph policy into the system prompt and bundles
-the `codebase-memory` skill, so the agent picks the right tool on its own.
-Typical workflow:
+- **A live daemon.** It starts when the plugin applies, and a later tool call respawns it if the child exited. It is disposed with the plugin. Nothing to supervise.
+- **A `/cbm` command.** Prints the executable path, the UI URL, and every indexed project with its status.
+- **A bundled agent skill.** Ranked at 600, model and user invocable, so the agent reaches for the graph before it reaches for grep.
+- **Graceful degradation.** A missing binary logs one warning and the tools return a degraded result. The plugin never fails to load because the daemon is absent.
+- **A reusable library.** Nine subpath exports, so you can drive the engine from your own code without a harness.
 
-1. `cbm_projects(reason="...")` — confirm the project is indexed. The tool
-   requires a short `reason` string for the tool-call card.
-2. `cbm_search(name_pattern=".*auth.*")` — find symbols by name/label/path.
-3. `cbm_trace(symbol="login", direction="both", max_depth=3)` — trace callers
-   and callees.
-4. `cbm_snippet(qualified_name="app.auth.login")` — read the exact definition
-   without loading whole files.
-5. `cbm_arch(directory="src")` — get a directory-level component overview.
+## How it works
 
-Quick decision matrix (from the bundled skill):
-
-| Question | Tool call |
-|----------|-----------|
-| Who calls X? | `cbm_trace(symbol="...", direction="inbound")` |
-| What does X call? | `cbm_trace(symbol="...", direction="outbound")` |
-| Full call context | `cbm_trace(symbol="...", direction="both")` |
-| Find by name pattern | `cbm_search(name_pattern="...")` |
-| Read source snippet | `cbm_snippet(qualified_name="...")` |
-| Directory architecture | `cbm_arch(directory="...")` |
-| Text search in repo | `cbm_search_code(query="...")` |
-| List indexed projects | `cbm_projects(reason="...")` |
-
-### Check status with `/cbm`
-
-````text
-🔍 **Codebase Memory MCP**
-• Executable: `/home/you/.local/bin/codebase-memory-mcp`
-• Web UI: http://localhost:9749/
-
-**Indexed Projects:**
 ```
-home-you-my-repo
+DSH agent ──▶ cbm_* tool ──▶ engine ──▶ JSON-RPC over stdio ──▶ codebase-memory-mcp
+                                                                      │
+browser ──▶ http://localhost:9749/ ──▶ graph UI ◀────────────────────┘
 ```
-````
 
-If the binary is missing, `/cbm` reports:
-`⚠️  codebase-memory-mcp executable not found. Install codebase-memory-mcp or set CBM_EXE.`
+Three layers, each replaceable on its own:
 
-### Web UI
+1. **Plugin entry** (`src/index.mjs`) reads the config, starts the daemon, and registers tools, prompt guidance, the skill, and the command.
+2. **Engine** (`src/engine.mjs`) translates DSH argument names into upstream names, guards the repository boundary, and returns a degraded shape when the binary is missing.
+3. **Client** (`src/client.mjs`) spawns the binary, speaks MCP JSON-RPC 2.0, and owns the process lifecycle.
 
-The daemon is launched with `--ui=true`, so an HTTP graph-visualization UI is
-served at **http://localhost:9749/** by default. The client can use another port
-when constructed directly (`new CodebaseMemoryClient({ port })`), but the DSH
-plugin uses the default 9749, and its prompts and `/cbm` output assume that port.
-
----
-
-## Available Tools
-
-The six tools return text. Most accept `repo` (repository root path, slugified
-automatically) and `project` (explicit project slug); `cbm_projects` takes only
-`reason`. Project and repository resolution is described under
-[Configuration](#configuration).
-
-| Tool | Description | Arguments (★ = required) |
-|------|-------------|--------------------------|
-| `cbm_projects` | List all projects indexed in the daemon | ★ `reason` |
-| `cbm_search` | Search the knowledge graph for symbols or files | `name_pattern`, `label` (`Function` \| `Class` \| `Interface` \| `File`), `file_path_pattern`, `limit` (default 50), `project`, `repo` |
-| `cbm_snippet` | Fetch the exact source snippet of a symbol | ★ `qualified_name`, `file_path`, `start_line`, `end_line`, `project`, `repo` |
-| `cbm_arch` | Architectural summary of a directory (components, entry points, dependencies) | `directory` (relative to repo root), `depth` (default 2), `project`, `repo` |
-| `cbm_trace` | Trace inbound/outbound call paths through the graph | ★ `symbol`, `direction` (`inbound` \| `outbound` \| `both`, default `both`), `max_depth` (default 3), `project`, `repo` |
-| `cbm_search_code` | Fast textual regex search over indexed files | ★ `query`, `file_pattern`, `limit` (default 50), `project`, `repo` |
-
-Each tool forwards to the daemon's MCP `tools/call` method
-(`list_projects`, `search_graph`, `get_code_snippet`, `get_architecture`,
-`trace_path`, `search_code`). The client's default JSON-RPC timeout is 60
-seconds; tool-level errors are surfaced as failed tool results.
-
-### Bridge behavior and limitations
-
-- `cbm_snippet` accepts `end_line` for schema compatibility, but the current
-  bridge forwards only `qualified_name` and `start_line` to the daemon. Use
-  `start_line` and let the daemon return its normal snippet context.
-- `cbm_arch` accepts `depth`, but the current client forwards only the project
-  and path; the daemon's default depth is used.
-- Indexing is **not** exposed as a `cbm_*` tool. The DSH plugin is query-only;
-  use the library API or the upstream CLI to build or refresh an index.
-- Tool results are text. No pagination, generation, freshness, or coverage
-  metadata is exposed through these six tools.
-
----
+[Read the architecture doc](docs/architecture.md) for the reasoning, and the [whitepaper](WHITEPAPER.md) for why the boundary sits where it does.
 
 ## Configuration
 
-### Plugin options in `cordis.yml`
-
-The plugin exports a Schemastery `Config`, so every option below is settable per deployment without touching code. Unset keys take the default shown.
+Every deployment can set these in `cordis.yml`:
 
 ```yaml
-# <profile>/cordis.yml
 plugins:
-  '@lovedolove/dsh-codebase-memory-mcp':
-    exePath: /usr/local/bin/codebase-memory-mcp   # default: discovered via CBM_EXE, then PATH
-    uiEnabled: true                                # default: true
-    port: 9749                                     # default: 9749
-    eagerStart: true                               # default: true
+  codebase-memory:
+    exePath: /usr/local/bin/codebase-memory-mcp  # falls back to CBM_EXE, then PATH
+    uiEnabled: true                              # default true
+    port: 9749                                   # default 9749
+    eagerStart: true                             # default true
 ```
 
-| Option | Type | Default | Effect |
-|--------|------|---------|--------|
-| `exePath` | string | discovered | Explicit binary path. Takes priority over `CBM_EXE` when both are set. |
-| `uiEnabled` | boolean | `true` | Pass `--ui` to the daemon and advertise the graph UI. |
-| `port` | number | `9749` | Preferred UI port, used in the daemon args and in the printed URL. |
-| `eagerStart` | boolean | `true` | Start the daemon at plugin load. Set `false` to start it lazily on the first `cbm_*` call. |
+Environment variables win where they apply. See [docs/configure.md](docs/configure.md) for the full discovery order.
 
-A value that does not match the schema is rejected by Cordis at startup rather than silently coerced.
+| Variable | Purpose |
+| --- | --- |
+| `CBM_EXE` | Path to the `codebase-memory-mcp` binary |
+| `CODEBASE_MEMORY_EXE` | Legacy alias for `CBM_EXE` |
+| `DSH_HOME` | Where DSH stores state, including index metadata |
 
-### Environment variables
-
-| Variable | Effect |
-|----------|--------|
-| `CBM_EXE` | Explicit path to the `codebase-memory-mcp` binary (must exist; takes priority over every other lookup). |
-| `CODEBASE_MEMORY_EXE` | Secondary explicit path, checked after `CBM_EXE`. |
-| `DSH_HOME` | Base directory for the plugin's index-status metadata. Defaults to `~/.dsh`. |
-
-### Project resolution order
-
-When a tool is called, the repository root is `repo` if supplied, otherwise the
-session working directory. The project is then resolved as:
-
-1. explicit `project` argument,
-2. slug of the repository root,
-3. slug of the current working directory.
-
-Slug mapping: `/home/user/my-repo` → `home-user-my-repo`; Windows paths keep a
-drive prefix, e.g. `C:\Users\me\app` → `C-Users-me-app`.
-
-### Daemon lifecycle
-
-The plugin applies `cbmApply()`, which starts the daemon eagerly at load unless
-`eagerStart: false` or the process is a test runner. The client also starts it on
-demand (`ensureStarted`) on the first RPC, so a call works even when the eager
-start was skipped or the child died. On plugin disposal the client is disposed,
-which kills the daemon and rejects any pending requests. The client also exposes
-`uiEnabled: false` for headless library use (`--ui=false`).
-
-### Index-status storage
-
-The engine persists only index status metadata, not the graph itself:
-
-```text
-$DSH_HOME/codebase-memory/projects/<projectId>/code_index.json
-```
-
-When `DSH_HOME` is unset the path is
-`~/.dsh/codebase-memory/projects/<projectId>/code_index.json`. A library caller
-can override the base directory with `config.home` or supply
-`config.getMetadataPath(repoRoot)`.
-
----
-
-## Library API
-
-The package is usable without DSH. The core modules are re-exported from the
-package root, and the same modules are available through subpath exports (the
-legacy bridge has its own `./bridge` subpath):
+## Use it as a library
 
 ```js
-import {
-  CodebaseMemoryClient,
-  CodeIntelligenceEngine,
-  discoverRepository,
-  cbmProjectName,
-  sanitizeCodeContent,
-  RepositoryWatcher,
-  createCbmToolDefinitions,
-  DEFAULT_UI_PORT,
-} from '@lovedolove/dsh-codebase-memory-mcp'
+import { CodeIntelligenceEngine } from '@lovedolove/dsh-codebase-memory-mcp/engine'
+
+const engine = new CodeIntelligenceEngine()
+const result = await engine.traceCallPath({
+  repoRoot: '/path/to/repo',
+  symbol: 'Object.handler',
+  direction: 'inbound',
+  depth: 3,
+})
+
+if (result.degraded) {
+  console.error('No graph available:', result.message)
+} else {
+  console.log(result.raw)
+}
 ```
 
-```js
-const client = new CodebaseMemoryClient()          // resolves the executable
-const engine = new CodeIntelligenceEngine({ client })
+The full surface is documented in [docs/library-api.md](docs/library-api.md).
 
-const repo = process.cwd()
-await engine.indexRepository(repo, { mode: 'fast' })
+## Requirements
 
-const found = await engine.searchSymbols(repo, { name_pattern: '.*auth.*' })
-const trace = await engine.traceCallPath(repo, { symbol: 'login', direction: 'both' })
+| Requirement | Version |
+| --- | --- |
+| DeepSeek Harness | `>=0.2.0 <0.3.0` (`engines.dsh`) |
+| Node.js | `>=18.0.0 <25.0.0` (`engines.node`) |
+| `codebase-memory-mcp` | Any recent release |
 
-client.dispose()
-```
+The binary is required for indexing and queries. It is not required for the plugin to load.
 
-Key exports:
+The plugin declares five optional peers: `@deepseek-ai/cordis` at `>=4.0.1-rc.1 <5.0.0-0`, plus `@deepseek-ai/dsh-tools`, `@deepseek-ai/dsh-system-prompt`, `@deepseek-ai/dsh-skill`, and `@deepseek-ai/dsh-commands` at `>=0.2.0 <0.3.0-0`. A missing peer disables the matching feature and logs a warning. It never blocks startup.
 
-| Export | Purpose |
-|--------|---------|
-| `CodebaseMemoryClient` | Spawns and talks to the daemon over stdio JSON-RPC 2.0. |
-| `getOrCreateCodeClient`, `resetSharedCodeClient`, `createClient` | Shared-client helpers. |
-| `CodeIntelligenceEngine` | Index lifecycle, status metadata, discovery, and sanitized query wrappers. |
-| `discoverRepository`, `cbmProjectName`, `resolveSafeRepoPath`, `isSensitiveOrSecret`, `isBinaryFile`, `parseGitignoreContent`, `matchesGitignore` | Repository discovery and safety helpers. |
-| `sanitizeCodeContent`, `scrub`, `redact` | Secret scrubbing for returned code. |
-| `RepositoryWatcher`, `closeAllWatchers` | Debounced recursive file watcher. |
-| `createCbmToolDefinitions`, `registerCbmTools` | DSH tool definitions and registration. |
-| `INDEX_STATUS`, `FRESHNESS_STATUS`, `CODE_ENTITY_TYPES`, `CODE_RELATIONS`, `TRACE_DIRECTIONS`, `DEFAULT_UI_PORT` | Shared constants. |
+## Documentation
 
-Subpath exports: `./client`, `./discovery`, `./engine`, `./tools`, `./types`,
-`./watcher`, and the legacy `./bridge`.
+| Document | Kind | Read it when |
+| --- | --- | --- |
+| [Install](docs/install.md) | How-to | You want the steps only |
+| [Configure](docs/configure.md) | Reference | You need a flag, a variable, or a path |
+| [Tools](docs/tools.md) | Reference | You are choosing a tool or an argument |
+| [Architecture](docs/architecture.md) | Explanation | You want to know why it is built this way |
+| [Library API](docs/library-api.md) | Reference | You are driving the engine yourself |
+| [Troubleshooting](docs/troubleshooting.md) | How-to | Something does not work |
+| [Whitepaper](WHITEPAPER.md) | Explanation | You want the design argument and the evidence |
+| [Whitepaper (中文)](WHITEPAPER.zh-CN.md) | Explanation | 你要读中文版的设计论证和证据 |
+| [AGENTS.md](AGENTS.md) | Reference | You are an agent working in this repo |
 
-### Indexing behavior
+## Development
 
-`CodeIntelligenceEngine.indexRepository(repoRoot, opts)` deduplicates concurrent
-requests for the same repository, moves status through `indexing` / `updating`,
-runs `discoverRepository` to apply exclusions, sensitive-file rules, and
-`.gitignore`, then asks the daemon to index the repository. The final state is
-persisted as `ready`, `degraded`, or `error`. `indexIncremental(repoRoot)` is a
-`mode: 'fast'` alias. If the executable is unavailable, the operation returns a
-`degraded` status without throwing.
-
-`discoverRepository` skips VCS directories, dependency/build output directories,
-caches, coverage output, sensitive files (`.env*`, keys, certificates), binary
-extensions, and files larger than 2 MiB.
-
----
-
-## Development & Testing
-
-```bash
-# Unit + integration test suite (node --test)
-npm test
-
-# Verify the published file set without publishing
+```sh
+npm ci          # install dev dependencies
+npm test        # 44 tests, node --test
 npm run pack:check
 ```
 
-The suite covers slugification, executable discovery and `CBM_EXE`, the JSON-RPC
-client, tool registration, the full plugin `apply` against a mocked Cordis
-context, and the DSH service integrations. A live `list_projects` check runs
-when a real executable is installed and is skipped otherwise. CI runs the suite
-on Node 20, 22, and 24.
+The suite covers the client, engine, discovery, tools, watcher, bridge, and plugin lifecycle. Two tests boot a fake MCP server and assert the real handshake.
 
-### Repository layout
+## Versioning
 
-```text
-src/
-  index.mjs       Plugin entry: apply(), guidance, /cbm, re-exports
-  client.mjs      Executable discovery + stdio JSON-RPC daemon client
-  engine.mjs      Index lifecycle, status metadata, query wrappers
-  discovery.mjs   Repo walk, ignore rules, sensitive/binary filtering
-  redact.mjs      Secret scrubbing and content sanitization
-  tools.mjs       Six cbm_* DSH tool definitions and registration
-  skills.mjs      Bundled skill provider
-  watcher.mjs     Debounced recursive repository watcher
-  types.mjs       Shared constants
-  bridge.mjs      Legacy compatibility re-exports
-skills/
-  codebase-memory/SKILL.md
-test/             node:test suites for each module and DSH integration
-```
-
----
-
-## Publishing
-
-Every push to `main` runs the **Publish** workflow: it runs the test suite, then
-publishes with npm Trusted Publishing (OIDC). If the current version already
-exists on npm, the workflow bumps the patch version, commits the bump with
-`[skip publish]`, and publishes the new version. A commit whose message contains
-`[skip publish]` skips publishing.
-
----
-
-## Troubleshooting
-
-| Symptom | Fix |
-|---------|-----|
-| `codebase-memory-mcp executable not found` | Install the executable, set `CBM_EXE` (or `CODEBASE_MEMORY_EXE`), and reload the DSH profile. |
-| Tools return `Code Intelligence Degraded` | The binary is missing or failed to start. Check the path and run `codebase-memory-mcp --version`. |
-| Web UI is not reachable | Look at the terminal where `dsh web` booted. `codebase-memory UI is live` on stderr means autostart worked; `executable not found` means the binary or `CBM_EXE` is missing. Confirm with `curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:9749/` (200 is up). Calling a `cbm_*` tool or `/cbm` retries the start. |
-| Project not found / empty results | Confirm the repository is indexed (`cbm_projects(reason="...")`) and pass the correct `project` slug or `repo` path. |
-| No symbols after indexing | The plugin does not index automatically; build the index through the library API or the upstream CLI. |
+`publish-npm.yml` runs on every push to `main`. It stages the package with `npm stage publish`, which does not make a release public by itself. A human approves the staged version in an authenticated npm session. Release notes come from [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
+
+<div align="center">
+
+If this saved you a grep, a star helps other people find it.
+
+[![Star History](https://api.star-history.com/svg?repos=LoveDoLove/dsh-codebase-memory-mcp&type=Date)](https://star-history.com/#LoveDoLove/dsh-codebase-memory-mcp&Date)
+
+</div>

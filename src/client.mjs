@@ -1,5 +1,5 @@
 /**
- * Veyra Code Intelligence — Upstream MCP IPC Client & Degraded Adapter.
+ * Codebase Memory — Upstream MCP IPC Client & Degraded Adapter.
  *
  * Communicates with the native codebase-memory-mcp executable via stdio JSON-RPC 2.0.
  * Implements:
@@ -162,7 +162,7 @@ export class CodebaseMemoryClient {
           params: {
             protocolVersion: '2025-03-26',
             capabilities: {},
-            clientInfo: { name: 'veyra-code-intelligence', version: '0.1.0' },
+            clientInfo: { name: 'codebase-memory', version: '0.1.0' },
           },
         }) + '\n'
       )
@@ -267,7 +267,7 @@ export class CodebaseMemoryClient {
       return {
         isError: true,
         degraded: true,
-        content: [{ type: 'text', text: `Code Intelligence unavailable: codebase-memory-mcp binary not found. Install via 'curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash' or set CBM_EXE. Veyra Memory remains fully functional.` }],
+        content: [{ type: 'text', text: `Code Intelligence unavailable: codebase-memory-mcp binary not found. Install via 'curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash' or set CBM_EXE.` }],
       }
     }
 

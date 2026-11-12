@@ -3,7 +3,7 @@
  *
  * Ships skills/<name>/SKILL.md for each entry in BUNDLED_SKILL_DEFINITIONS
  * and registers them as a native bundled provider so the model-facing
- * `skill` tool can load them. Matches the Veyra pattern:
+ * `skill` tool can load them:
  * ctx.skills.registerProvider at rank 600, source "bundled".
  *
  * Also exposes registerRuntimeSkill() for hosts that only have

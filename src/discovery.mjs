@@ -1,5 +1,5 @@
 /**
- * Veyra Code Intelligence — Repository Ingestion & Discovery.
+ * Codebase Memory — Repository Ingestion & Discovery.
  *
  * Implements Stage 1 & 2 repository boundaries:
  *   - Path normalization & path-traversal protection (fail-closed)

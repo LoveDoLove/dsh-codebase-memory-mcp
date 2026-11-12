@@ -17,8 +17,10 @@ navigation from an existing codebase-memory-mcp index.
 
 Web visual graph interface: http://localhost:9749/
 
-The daemon starts lazily on the first tool call. The six tools always exist; if
-the `codebase-memory-mcp` executable is missing, calls return a degraded result.
+The daemon starts when the plugin applies, so a `dsh web` boot already has a
+live UI at that address. Set `eagerStart: false` in the plugin config to defer
+the start to the first tool call. The six tools always exist; if the
+`codebase-memory-mcp` executable is missing, calls return a degraded result.
 
 ## Quick Decision Matrix
 

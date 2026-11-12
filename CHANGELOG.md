@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.10] - 2026-11-12
+
+### Added
+- A documentation set. `README.md` is rewritten in English and `README.zh-CN.md` carries the Chinese version. `WHITEPAPER.md` explains the design and the evidence behind it, and `WHITEPAPER.zh-CN.md` carries the Chinese version. `AGENTS.md` indexes the working rules and routes each topic to its own page under `docs/`: `install.md`, `configure.md`, `tools.md`, `architecture.md`, `library-api.md` and `troubleshooting.md`. `CLAUDE.md` points at `AGENTS.md`.
+
+### Fixed
+- The npm tarball now ships `docs/`, `README.zh-CN.md`, `WHITEPAPER.md`, `WHITEPAPER.zh-CN.md` and `AGENTS.md`. Before this every `docs/` link in the README resolved to nothing on npmjs.com, and the Chinese README, both whitepapers and the agent notes were absent from the package entirely.
+
+### Changed
+- The source comments and the bundled skill text no longer mention the project's former name. The JSON-RPC `clientInfo` name is `codebase-memory`, and the index metadata comment names `$DSH_HOME/codebase-memory/projects/<projectId>/code_index.json`.
+- The bundled skill states that the daemon starts when the plugin applies, not lazily on the first tool call. Setting `eagerStart: false` defers it.
+
 ## [0.1.9] - 2026-11-12
 
 ### Added
