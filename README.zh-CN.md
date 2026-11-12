@@ -8,7 +8,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=flat-square)](LICENSE)
 [![CI](https://github.com/LoveDoLove/dsh-codebase-memory-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/LoveDoLove/dsh-codebase-memory-mcp/actions/workflows/ci.yml)
 [![M8ven Score](https://m8ven.ai/badge/mcp/lovedolove/dsh-codebase-memory-mcp)](https://m8ven.ai/badge/mcp/lovedolove/dsh-codebase-memory-mcp)
-[![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-0.2.x-blueviolet?style=flat-square)](https://github.com/deepseek-ai/dsh)
+[![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-0.2.x-blueviolet?style=flat-square)](https://github.com/deepseek-ai/deepseek-harness)
 
 [English](README.md) · [中文](README.zh-CN.md) · [白皮书](WHITEPAPER.md) · [文档](docs/install.md)
 
@@ -20,7 +20,7 @@
 
 `grep` 只能找到文本。它不知道 `Object.handler` 被三个工具调用，不知道 `apply` 是入口，也不知道 `src/engine.mjs` 只被 `src/index.mjs` 导入。每次智能体要回答"谁调用了这个函数"，它都得 grep、打开五个文件、然后猜。
 
-这个插件给 DeepSeek Harness 一张真正的代码图谱。它连接 [`codebase-memory-mcp`](https://github.com/lovedolove/codebase-memory-mcp)，保持守护进程运行，并注册六个直接回答结构性问题的工具。智能体问一次就能拿到调用链。
+这个插件给 DeepSeek Harness 一张真正的代码图谱。它连接 [`codebase-memory-mcp`](https://github.com/DeusData/codebase-memory-mcp)，保持守护进程运行，并注册六个直接回答结构性问题的工具。智能体问一次就能拿到调用链。
 
 ## 快速开始
 

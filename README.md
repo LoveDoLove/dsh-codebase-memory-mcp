@@ -8,7 +8,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=flat-square)](LICENSE)
 [![CI](https://github.com/LoveDoLove/dsh-codebase-memory-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/LoveDoLove/dsh-codebase-memory-mcp/actions/workflows/ci.yml)
 [![M8ven Score](https://m8ven.ai/badge/mcp/lovedolove/dsh-codebase-memory-mcp)](https://m8ven.ai/badge/mcp/lovedolove/dsh-codebase-memory-mcp)
-[![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-0.2.x-blueviolet?style=flat-square)](https://github.com/deepseek-ai/dsh)
+[![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-0.2.x-blueviolet?style=flat-square)](https://github.com/deepseek-ai/deepseek-harness)
 
 [English](README.md) · [中文](README.zh-CN.md) · [Whitepaper](WHITEPAPER.md) · [Docs](docs/install.md)
 
@@ -20,7 +20,7 @@
 
 `grep` finds text. It does not know that `Object.handler` is called by three tools, that `apply` is the entry point, or that `src/engine.mjs` is imported by `src/index.mjs` and nothing else. Every time your agent needs to answer "who calls this", it greps, reads five files, and guesses.
 
-This plugin gives DeepSeek Harness a real code graph. It bridges to [`codebase-memory-mcp`](https://github.com/lovedolove/codebase-memory-mcp), keeps the daemon running, and registers six tools that answer structural questions directly. The agent asks once and gets the call chain.
+This plugin gives DeepSeek Harness a real code graph. It bridges to [`codebase-memory-mcp`](https://github.com/DeusData/codebase-memory-mcp), keeps the daemon running, and registers six tools that answer structural questions directly. The agent asks once and gets the call chain.
 
 ## Quick start
 
