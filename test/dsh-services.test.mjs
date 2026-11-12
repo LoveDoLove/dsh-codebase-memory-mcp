@@ -195,3 +195,48 @@ test('plugin disposal reverses every registration and resets the shared client',
   assert.notEqual(clientAfter, clientBefore, 'shared client instance should be fresh after disposal')
   clientAfter.dispose?.()
 })
+
+// A config value set in cordis.yml must reach the plugin's apply(). Cordis
+// validates against the exported Config schema before calling apply, so a
+// value that survives the schema is exactly what a real profile would pass.
+test('real Cordis validates Config and hands the port to apply', { skip }, async () => {
+  const { Context } = await importDsh('@deepseek-ai/cordis')
+  const { default: SystemPrompt } = await importDsh('@deepseek-ai/dsh-system-prompt')
+  const { default: ToolRuntime } = await importDsh('@deepseek-ai/dsh-tools')
+  const plugin = await import('../src/index.mjs')
+
+  const ctx = new Context()
+  await ctx.plugin(SystemPrompt)
+  await ctx.plugin(ToolRuntime)
+  await mountExecutor(ctx)
+
+  // The profile loader composes the plugin from its default export, so the
+  // schema has to be reachable there. A named export alone would be invisible.
+  assert.equal(plugin.default.Config, plugin.Config, 'Config must be on the default export')
+  assert.equal(typeof plugin.default.Config?.['~standard']?.validate, 'function', 'Config must implement Standard Schema')
+
+  const seen = []
+  const recorder = {
+    name: 'recorder',
+    inject: ['tools'],
+    apply(c, config) { seen.push(config) },
+    Config: plugin.default.Config,
+  }
+  await ctx.plugin(recorder, { port: 8123 })
+  assert.equal(seen.length, 1)
+  assert.equal(seen[0].port, 8123, 'a configured port must reach apply()')
+  assert.equal(seen[0].uiEnabled, true, 'schema defaults fill in unset keys')
+
+  // The guidance and command text must advertise the configured port, not 9749.
+  const out = []
+  await plugin.registerSystemPromptGuidance(
+    {
+      effect: (fn) => fn(),
+      systemPrompt: { section: (s) => out.push(s) },
+    },
+    { warn() {} },
+    8123,
+  )
+  assert.ok(out[0].text.includes('http://localhost:8123/'), 'guidance advertises the configured port')
+  assert.ok(!out[0].text.includes('9749'), 'guidance no longer hardcodes the default port')
+})

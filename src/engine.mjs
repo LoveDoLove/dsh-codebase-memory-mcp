@@ -192,7 +192,7 @@ export class CodeIntelligenceEngine {
   /**
    * Search symbols in graph.
    */
-  async searchSymbols(repoRoot, params = {}) {
+  async searchSymbols(repoRoot, params = {}, signal) {
     if (this.isDegraded) {
       return { ok: false, degraded: true, symbols: [], message: 'Code intelligence degraded' }
     }
@@ -206,7 +206,7 @@ export class CodeIntelligenceEngine {
       limit: params.limit || 50,
     }
 
-    const res = await this.client.searchGraph(args)
+    const res = await this.client.searchGraph(args, signal)
     if (res.isError) {
       return { ok: false, degraded: Boolean(res.degraded), symbols: [], message: res.content?.[0]?.text }
     }
@@ -220,14 +220,14 @@ export class CodeIntelligenceEngine {
   }
 
   /** Alias for searchSymbols */
-  async searchGraph(repoRoot, params = {}) {
-    return this.searchSymbols(repoRoot, params)
+  async searchGraph(repoRoot, params = {}, signal) {
+    return this.searchSymbols(repoRoot, params, signal)
   }
 
   /**
    * Trace call path (inbound, outbound, both).
    */
-  async traceCallPath(repoRoot, params = {}) {
+  async traceCallPath(repoRoot, params = {}, signal) {
     if (this.isDegraded) {
       return { ok: false, degraded: true, message: 'Code intelligence degraded' }
     }
@@ -240,7 +240,7 @@ export class CodeIntelligenceEngine {
       depth: params.depth || params.max_depth || params.maxDepth || 3,
     }
 
-    const res = await this.client.tracePath(args)
+    const res = await this.client.tracePath(args, signal)
     if (res.isError) {
       return { ok: false, degraded: Boolean(res.degraded), message: res.content?.[0]?.text }
     }
@@ -254,7 +254,7 @@ export class CodeIntelligenceEngine {
   /**
    * Get code snippet.
    */
-  async getCodeSnippet(repoRoot, params = {}) {
+  async getCodeSnippet(repoRoot, params = {}, signal) {
     if (this.isDegraded) {
       return { ok: false, degraded: true, snippet: '', message: 'Code intelligence degraded' }
     }
@@ -276,7 +276,7 @@ export class CodeIntelligenceEngine {
       max_lines: params.max_lines || params.maxLines,
     }
 
-    const res = await this.client.getCodeSnippet(args)
+    const res = await this.client.getCodeSnippet(args, signal)
     if (res.isError) {
       return { ok: false, degraded: Boolean(res.degraded), snippet: '', message: res.content?.[0]?.text }
     }
@@ -293,7 +293,7 @@ export class CodeIntelligenceEngine {
   /**
    * Get architectural overview.
    */
-  async getArchitecture(repoRoot, params = {}) {
+  async getArchitecture(repoRoot, params = {}, signal) {
     if (this.isDegraded) {
       return { ok: false, degraded: true, message: 'Code intelligence degraded' }
     }
@@ -305,7 +305,7 @@ export class CodeIntelligenceEngine {
       depth: params.depth || 2,
     }
 
-    const res = await this.client.getArchitecture(args)
+    const res = await this.client.getArchitecture(args, signal)
     if (res.isError) {
       return { ok: false, degraded: Boolean(res.degraded), message: res.content?.[0]?.text }
     }
@@ -319,7 +319,7 @@ export class CodeIntelligenceEngine {
   /**
    * Search code text.
    */
-  async searchCodeText(repoRoot, params = {}) {
+  async searchCodeText(repoRoot, params = {}, signal) {
     if (this.isDegraded) {
       return { ok: false, degraded: true, message: 'Code intelligence degraded' }
     }
@@ -332,7 +332,7 @@ export class CodeIntelligenceEngine {
       limit: params.limit || 50,
     }
 
-    const res = await this.client.searchCode(args)
+    const res = await this.client.searchCode(args, signal)
     if (res.isError) {
       return { ok: false, degraded: Boolean(res.degraded), message: res.content?.[0]?.text }
     }
@@ -347,12 +347,12 @@ export class CodeIntelligenceEngine {
   /**
    * List indexed projects.
    */
-  async listProjects() {
+  async listProjects(signal) {
     if (this.isDegraded) {
       return { ok: false, degraded: true, projects: [] }
     }
 
-    const res = await this.client.listProjects()
+    const res = await this.client.listProjects(signal)
     if (res.isError) {
       return { ok: false, degraded: Boolean(res.degraded), projects: [] }
     }

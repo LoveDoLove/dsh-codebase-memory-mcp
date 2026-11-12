@@ -84,3 +84,102 @@ test('plugin apply auto-starts the daemon with the graph UI enabled', async () =
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+// `dsh web` boots with a Cordis ctx.logger whose exporters never reach the
+// terminal: the only exporter DSH installs on a web boot collects warn/error
+// for the startup-error report. A banner sent through ctx.logger is therefore
+// invisible, which is why the daemon could be up while the user saw nothing.
+// The startup notice must reach a real stream, and it must be stderr because
+// ACP profiles frame their protocol on stdout.
+function captureStderr() {
+  const chunks = []
+  const original = process.stderr.write
+  process.stderr.write = (chunk, ...rest) => {
+    chunks.push(String(chunk))
+    return original.call(process.stderr, chunk, ...rest)
+  }
+  return {
+    text: () => chunks.join(''),
+    restore: () => { process.stderr.write = original },
+  }
+}
+
+test('apply() announces the daemon on stderr, not only through ctx.logger', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'cbm-announce-'))
+  const exe = join(dir, 'codebase-memory-mcp')
+  const marker = join(dir, 'spawned.txt')
+  writeFileSync(exe, fakeMcpServer(marker))
+  execSync(`chmod +x "${exe}"`)
+
+  const prevExe = process.env.CBM_EXE
+  process.env.CBM_EXE = exe
+  resetSharedCodeClient()
+  const stderr = captureStderr()
+
+  try {
+    apply(mockCtx(), { eagerStart: true })
+
+    const announced = await waitFor(() => /9749/.test(stderr.text()), 10_000)
+    assert.ok(
+      announced,
+      'a user watching `dsh web` must see the daemon start; ctx.logger alone is invisible',
+    )
+    assert.match(stderr.text(), /codebase-memory/, 'the notice must name the plugin')
+  } finally {
+    stderr.restore()
+    resetSharedCodeClient()
+    if (prevExe === undefined) delete process.env.CBM_EXE
+    else process.env.CBM_EXE = prevExe
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+// --- Config schema ---
+
+test('plugin exports a schemastery Config with documented defaults', async () => {
+  const mod = await import('../src/index.mjs')
+  const { Config } = mod.default
+  assert.ok(Config, 'the default export must carry Config so cordis can validate cordis.yml')
+  assert.equal(typeof Config.simplify, 'function', 'Config must be a schemastery schema')
+
+  // Cordis validates plugin config through the Standard Schema interface.
+  const { value, issues } = Config['~standard'].validate({})
+  assert.equal(issues, undefined)
+  assert.equal(value.uiEnabled, true)
+  assert.equal(value.port, 9749)
+  assert.equal(value.eagerStart, true)
+  assert.equal(value.exePath, undefined, 'exePath stays unset so discovery can take over')
+})
+
+test('Config rejects a non-numeric port instead of coercing it', async () => {
+  const { Config } = (await import('../src/index.mjs')).default
+  const { issues } = Config['~standard'].validate({ port: 'not-a-port' })
+  assert.ok(issues?.length, 'an invalid port must be reported, not silently accepted')
+})
+
+test('apply() honours a configured port in the daemon args and the banner', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'cbm-port-'))
+  const exe = join(dir, 'codebase-memory-mcp')
+  const marker = join(dir, 'spawned.txt')
+  writeFileSync(exe, fakeMcpServer(marker))
+  execSync(`chmod +x "${exe}"`)
+
+  const prevExe = process.env.CBM_EXE
+  process.env.CBM_EXE = exe
+  resetSharedCodeClient()
+  const stderr = captureStderr()
+
+  try {
+    apply(mockCtx(), { eagerStart: true, port: 8123 })
+
+    const announced = await waitFor(() => /8123/.test(stderr.text()), 10_000)
+    assert.ok(announced, 'the startup notice must advertise the configured port')
+    assert.match(readFileSync(marker, 'utf8'), /--port=8123/, 'the daemon must bind the configured port')
+  } finally {
+    stderr.restore()
+    resetSharedCodeClient()
+    if (prevExe === undefined) delete process.env.CBM_EXE
+    else process.env.CBM_EXE = prevExe
+    rmSync(dir, { recursive: true, force: true })
+  }
+})

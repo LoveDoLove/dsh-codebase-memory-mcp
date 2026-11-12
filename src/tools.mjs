@@ -27,45 +27,6 @@ export function textBlocks(text) {
   return [{ type: 'text', text: String(text ?? '') }]
 }
 
-export function toRawOutputSchema(schema) {
-  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return schema
-  if (Array.isArray(schema.oneOf)) {
-    return { ...schema, oneOf: schema.oneOf.map(toRawOutputSchema) }
-  }
-  if (schema.type === 'array') {
-    return schema.items ? { ...schema, items: toRawOutputSchema(schema.items) } : { ...schema }
-  }
-  if (schema.type !== 'object') {
-    if (!Object.hasOwn(schema, 'required')) return schema
-    const { required: _drop, ...rest } = schema
-    return rest
-  }
-  const properties = schema.properties && typeof schema.properties === 'object'
-    ? schema.properties
-    : null
-  const lifted = []
-  const nextProps = {}
-  if (properties) {
-    for (const [key, node] of Object.entries(properties)) {
-      if (node && typeof node === 'object' && !Array.isArray(node) && node.required === true) {
-        lifted.push(key)
-        const { required: _drop, ...rest } = node
-        nextProps[key] = toRawOutputSchema(rest)
-      } else {
-        nextProps[key] = toRawOutputSchema(node)
-      }
-    }
-  }
-  const required = Array.isArray(schema.required)
-    ? [...new Set([...schema.required, ...lifted])]
-    : lifted
-  const next = { ...schema }
-  if (properties) next.properties = nextProps
-  if (required.length) next.required = required
-  else delete next.required
-  return next
-}
-
 export function resolveWorkspace(source) {
   const candidates = [
     source?.session?.header?.cwd,
@@ -125,7 +86,7 @@ export function createCbmToolDefinitions(runtime = {}) {
       },
       async execute(args, exec) {
         const engine = getEngine(exec)
-        return await engine.listProjects()
+        return await engine.listProjects(exec?.signal)
       },
       presentCall: (args) => ({ card: 'generic', title: 'Code Projects', kind: 'read', rawInput: args?.reason }),
     },
@@ -160,7 +121,7 @@ export function createCbmToolDefinitions(runtime = {}) {
         const cwd = getCwd(exec)
         const targetRepo = args?.repo || cwd
         const engine = getEngine(exec)
-        return await engine.searchSymbols(targetRepo, args)
+        return await engine.searchSymbols(targetRepo, args, exec?.signal)
       },
       presentCall: (args) => ({ card: 'generic', title: 'Code Search', kind: 'read', rawInput: args?.name_pattern || args?.file_path_pattern || 'all' }),
     },
@@ -195,7 +156,7 @@ export function createCbmToolDefinitions(runtime = {}) {
         const cwd = getCwd(exec)
         const targetRepo = args?.repo || cwd
         const engine = getEngine(exec)
-        return await engine.getCodeSnippet(targetRepo, args)
+        return await engine.getCodeSnippet(targetRepo, args, exec?.signal)
       },
       presentCall: (args) => ({ card: 'generic', title: 'Code Snippet', kind: 'read', rawInput: args?.qualified_name }),
     },
@@ -229,7 +190,7 @@ export function createCbmToolDefinitions(runtime = {}) {
         const cwd = getCwd(exec)
         const targetRepo = args?.repo || cwd
         const engine = getEngine(exec)
-        return await engine.traceCallPath(targetRepo, args)
+        return await engine.traceCallPath(targetRepo, args, exec?.signal)
       },
       presentCall: (args) => ({ card: 'generic', title: 'Code Call Trace', kind: 'read', rawInput: `${args?.symbol} (${args?.direction || 'both'})` }),
     },
@@ -262,7 +223,7 @@ export function createCbmToolDefinitions(runtime = {}) {
         const cwd = getCwd(exec)
         const targetRepo = args?.repo || cwd
         const engine = getEngine(exec)
-        return await engine.getArchitecture(targetRepo, args)
+        return await engine.getArchitecture(targetRepo, args, exec?.signal)
       },
       presentCall: (args) => ({ card: 'generic', title: 'Architecture Summary', kind: 'read', rawInput: args?.directory || '' }),
     },
@@ -296,7 +257,7 @@ export function createCbmToolDefinitions(runtime = {}) {
         const cwd = getCwd(exec)
         const targetRepo = args?.repo || cwd
         const engine = getEngine(exec)
-        return await engine.searchCodeText(targetRepo, args)
+        return await engine.searchCodeText(targetRepo, args, exec?.signal)
       },
       presentCall: (args) => ({ card: 'generic', title: 'Search Code Text', kind: 'read', rawInput: args?.query }),
     },
@@ -311,19 +272,16 @@ export function registerCbmTools(ctx, clientOrOpts = {}) {
   if (!ctx?.tools?.register) return []
 
   let runtime = {}
-  let legacyText = false
 
   if (clientOrOpts && typeof clientOrOpts.call === 'function') {
     runtime = {
       codeEngine: new CodeIntelligenceEngine({ client: clientOrOpts }),
     }
-    legacyText = Boolean(clientOrOpts._legacyText)
   } else if (clientOrOpts && (clientOrOpts.codeEngine || clientOrOpts.client)) {
     runtime = {
       codeEngine: clientOrOpts.codeEngine || new CodeIntelligenceEngine({ client: clientOrOpts.client }),
       ...clientOrOpts,
     }
-    legacyText = Boolean(clientOrOpts.legacyText)
   } else {
     runtime = clientOrOpts || {}
   }
@@ -332,20 +290,7 @@ export function registerCbmTools(ctx, clientOrOpts = {}) {
   const registered = []
 
   for (const def of toolDefs) {
-    let toolToRegister = def
-    if (legacyText) {
-      toolToRegister = {
-        ...def,
-        execute: async (args, exec) => {
-          const res = await def.execute(args, exec)
-          if (typeof res === 'string') return res
-          if (res?.raw !== undefined) return res.raw
-          if (res?.snippet !== undefined) return res.snippet
-          if (res?.message !== undefined) return res.message
-          return JSON.stringify(res)
-        },
-      }
-    }
+    const toolToRegister = def
 
     try {
       if (typeof ctx.effect === 'function') {

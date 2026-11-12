@@ -5,12 +5,14 @@
  * symbol indexing, textual search, and knowledge graph navigation.
  */
 
+import Schema from '@deepseek-ai/schemastery'
 import {
   projectNameFromPath,
 } from './bridge.mjs'
 import { cbmApply, findExe, getOrCreateClient } from './client.mjs'
 import { registerCbmTools } from './tools.mjs'
 import { registerSkills } from './skills.mjs'
+import { DEFAULT_UI_PORT } from './types.mjs'
 
 // --- Core Re-exports ---
 export * from './types.mjs'
@@ -29,10 +31,26 @@ export {
 export const name = 'codebase-memory'
 export const inject = ['tools']
 
-export const GUIDANCE_TEXT = `## Codebase Memory — Knowledge Graph Policy
+/**
+ * Plugin configuration, settable from cordis.yml.
+ * @typedef {object} Config
+ * @property {string} [exePath] Path to the codebase-memory-mcp binary; falls back to CBM_EXE, then PATH discovery.
+ * @property {boolean} [uiEnabled] Pass --ui to the daemon and advertise the graph UI.
+ * @property {number} [port] Preferred daemon UI port.
+ * @property {boolean} [eagerStart] Start the daemon as soon as the plugin loads.
+ */
+
+export const Config = Schema.object({
+  exePath: Schema.string().description('Path to the codebase-memory-mcp binary; falls back to CBM_EXE, then PATH discovery.'),
+  uiEnabled: Schema.boolean().default(true).description('Pass --ui to the daemon and advertise the graph UI.'),
+  port: Schema.number().default(DEFAULT_UI_PORT).description('Preferred daemon UI port.'),
+  eagerStart: Schema.boolean().default(true).description('Start the daemon as soon as the plugin loads.'),
+})
+
+export const guidanceText = (port = DEFAULT_UI_PORT) => `## Codebase Memory — Knowledge Graph Policy
 Codebase Memory provides structural code intelligence and AST-level call-graph navigation.
 Tools: \`cbm_projects\`, \`cbm_search\`, \`cbm_snippet\`, \`cbm_trace\`, \`cbm_arch\`, \`cbm_search_code\`.
-Web visual graph interface: http://localhost:9749/
+Web visual graph interface: http://localhost:${port}/
 
 When to use Codebase Memory vs text grep:
 - Prefer \`cbm_trace\` for caller/callee relationships, call hierarchies, and blast-radius / impact analysis (precise structural graph vs noisy text search).
@@ -47,6 +65,8 @@ Workflow:
 3. Trace dependencies: \`cbm_trace(symbol="...", direction="inbound"|"outbound"|"both")\` to trace call graphs.
 4. Inspect definition: \`cbm_snippet(qualified_name="...")\` to inspect code without loading entire files.`
 
+export const GUIDANCE_TEXT = guidanceText()
+
 function loggerOf(ctx) {
   const log = ctx.logger ? ctx.logger('codebase-memory') : console
   return {
@@ -56,14 +76,14 @@ function loggerOf(ctx) {
   }
 }
 
-export function registerSystemPromptGuidance(scope, log) {
+export function registerSystemPromptGuidance(scope, log, port = DEFAULT_UI_PORT) {
   if (!scope?.systemPrompt || typeof scope.systemPrompt.section !== 'function') return false
   try {
     scope.effect(
       () => scope.systemPrompt.section({
         name: 'codebase-memory:guidance',
         order: 3040,
-        text: GUIDANCE_TEXT,
+        text: guidanceText(port),
       }),
       'codebase-memory: guidance',
     )
@@ -75,12 +95,12 @@ export function registerSystemPromptGuidance(scope, log) {
   }
 }
 
-export function registerSlashCommands(scope, log) {
+export function registerSlashCommands(scope, log, port = DEFAULT_UI_PORT) {
   if (!scope?.commands || typeof scope.commands.register !== 'function') return false
   try {
     scope.effect(() => scope.commands.register({
       name: 'cbm',
-      description: 'Show codebase-memory status and Web UI link (http://localhost:9749/)',
+      description: `Show codebase-memory status and Web UI link (http://localhost:${port}/)`,
       handler: async () => {
         const exe = findExe()
         if (!exe) {
@@ -112,7 +132,7 @@ export function registerSlashCommands(scope, log) {
           text: [
             '🔍 **Codebase Memory MCP**',
             `• Executable: \`${exe}\``,
-            '• Web UI: http://localhost:9749/',
+            `• Web UI: http://localhost:${port}/`,
             '',
             '**Indexed Projects:**',
             '```',
@@ -123,7 +143,8 @@ export function registerSlashCommands(scope, log) {
       },
     }), 'codebase-memory: slash-commands')
     return true
-  } catch {
+  } catch (err) {
+    log?.warn?.(`[codebase-memory] commands.register failed: ${err instanceof Error ? err.message : String(err)}`)
     return false
   }
 }
@@ -135,6 +156,7 @@ export function registerSlashCommands(scope, log) {
  */
 export function apply(ctx, config = {}) {
   const log = loggerOf(ctx)
+  const port = config.port || DEFAULT_UI_PORT
 
   // 1. Client lifecycle, eager daemon start, and tool registration.
   //    cbmApply owns the dispose effect and the auto-start; the 0.1.5 rewrite
@@ -145,44 +167,33 @@ export function apply(ctx, config = {}) {
     log.info(`[codebase-memory] registered tools: ${toolNames.join(', ')}`)
   }
 
-  // 2. System prompt — must use ctx.inject(), never direct property access
-  if (typeof ctx.inject === 'function') {
-    try {
-      ctx.inject(['systemPrompt'], (scope) => {
-        registerSystemPromptGuidance(scope, log)
-      })
-    } catch {
-      // systemPrompt service not available; skip
+  // 2-4. Optional capabilities. ctx.inject() waits for the service, so a
+  //      missing service is not an error — but a real registration failure
+  //      must surface instead of disappearing.
+  injectCapability(ctx, log, 'systemPrompt', ['systemPrompt'], (scope) => {
+    registerSystemPromptGuidance(scope, log, port)
+  })
+  injectCapability(ctx, log, 'skills', ['skills'], (scope) => {
+    void registerSkills(scope, log).then((names) => {
+      if (names.length) log.info(`[codebase-memory] registered skill: ${names.join(', ')}`)
+    }).catch((err) => {
+      log.warn(`[codebase-memory] skill register failed: ${err instanceof Error ? err.message : String(err)}`)
+    })
+  })
+  injectCapability(ctx, log, 'commands', ['commands'], (scope) => {
+    if (registerSlashCommands(scope, log, port)) {
+      log.info('[codebase-memory] registered /cbm command')
     }
-  }
+  })
+}
 
-  // 3. Bundled skill registration — must use ctx.inject()
-  if (typeof ctx.inject === 'function') {
-    try {
-      ctx.inject(['skills'], (scope) => {
-        void registerSkills(scope, log).then((names) => {
-          if (names.length) log.info(`[codebase-memory] registered skill: ${names.join(', ')}`)
-        }).catch((err) => {
-          log.warn(`[codebase-memory] skill register failed: ${err instanceof Error ? err.message : String(err)}`)
-        })
-      })
-    } catch {
-      // skills service not available; skip
-    }
-  }
-
-  // 4. Slash command registration — must use ctx.inject()
-  if (typeof ctx.inject === 'function') {
-    try {
-      ctx.inject(['commands'], (scope) => {
-        if (registerSlashCommands(scope, log)) {
-          log.info('[codebase-memory] registered /cbm command')
-        }
-      })
-    } catch {
-      // commands service not available; skip
-    }
+function injectCapability(ctx, log, label, deps, callback) {
+  if (typeof ctx.inject !== 'function') return
+  try {
+    ctx.inject(deps, callback)
+  } catch (err) {
+    log.warn(`[codebase-memory] ${label} registration failed: ${err instanceof Error ? err.message : String(err)}`)
   }
 }
 
-export default { name, inject, apply }
+export default { name, inject, Config, apply }
