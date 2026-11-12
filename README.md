@@ -248,6 +248,29 @@ seconds; tool-level errors are surfaced as failed tool results.
 
 ## Configuration
 
+### Plugin options in `cordis.yml`
+
+The plugin exports a Schemastery `Config`, so every option below is settable per deployment without touching code. Unset keys take the default shown.
+
+```yaml
+# <profile>/cordis.yml
+plugins:
+  '@lovedolove/dsh-codebase-memory-mcp':
+    exePath: /usr/local/bin/codebase-memory-mcp   # default: discovered via CBM_EXE, then PATH
+    uiEnabled: true                                # default: true
+    port: 9749                                     # default: 9749
+    eagerStart: true                               # default: true
+```
+
+| Option | Type | Default | Effect |
+|--------|------|---------|--------|
+| `exePath` | string | discovered | Explicit binary path. Takes priority over `CBM_EXE` when both are set. |
+| `uiEnabled` | boolean | `true` | Pass `--ui` to the daemon and advertise the graph UI. |
+| `port` | number | `9749` | Preferred UI port, used in the daemon args and in the printed URL. |
+| `eagerStart` | boolean | `true` | Start the daemon at plugin load. Set `false` to start it lazily on the first `cbm_*` call. |
+
+A value that does not match the schema is rejected by Cordis at startup rather than silently coerced.
+
 ### Environment variables
 
 | Variable | Effect |

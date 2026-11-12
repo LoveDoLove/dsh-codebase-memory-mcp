@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.9] - 2026-11-12
+
+### Added
+- `Config` Schemastery schema, exported on the default export. `exePath`, `uiEnabled`, `port` and `eagerStart` are now settable from `cordis.yml` and validated at startup. `DEFAULT_UI_PORT` is the source of truth for the default port, and the guidance text, `/cbm` output and startup banner all use the configured value instead of a hardcoded `9749`.
+
+### Fixed
+- `exec.signal` is honoured end to end. Cancelling a `cbm_*` tool call aborts the in-flight JSON-RPC request, rejects with an `AbortError`, and clears the pending entry and its timer. Previously the signal was dropped and a cancelled call kept running until the 60s rpc timeout.
+- A failed registration of the optional `systemPrompt`, `skills` or `commands` capability now logs a warning instead of disappearing into an empty `catch`.
+- `engines.dsh` declares the supported harness range (`>=0.2.0 <0.3.0`), so an incompatible DSH refuses the install instead of loading a plugin that calls APIs it does not have.
+
+### Changed
+- `registerCbmTools()` returns the canonical value declared by each tool's `output.schema`. The `legacyText` mode that flattened those values to strings is removed, along with the bridge option that enabled it. Text rendering belongs to `output.render`, as the tool contract specifies.
+- Dropped the dead `dsh.compatibility` block from `package.json`; nothing reads it. Peer floors moved to the DSH versions that actually provide the APIs in use.
+- Removed the unused `toRawOutputSchema` helper.
+- CI installs dependencies before `npm test`, because the plugin now has a runtime dependency.
+
 ## [0.1.8] - 2026-11-12
 
 ### Fixed

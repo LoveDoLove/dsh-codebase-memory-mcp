@@ -32,10 +32,9 @@ export const EXE = findCodebaseMemoryExe()
 
 /**
  * Register cbm_* tools onto ctx.tools for bridge consumers.
- * Supports legacy string return values for existing test expectations.
  */
 export function registerCbmTools(ctx, client) {
-  return registerModernTools(ctx, { client, legacyText: true })
+  return registerModernTools(ctx, { client })
 }
 
 /**

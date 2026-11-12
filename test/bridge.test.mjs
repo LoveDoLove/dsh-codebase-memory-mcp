@@ -139,20 +139,26 @@ test('registerCbmTools registers all 6 cbm_* tools and handles execution', async
       assert.ok(registeredTools.has(name), `Tool ${name} should be registered`);
     }
 
-    // Test calling cbm_projects
+    // Test calling cbm_projects — execute returns the declared canonical
+    // value; rendering to text is output.render's job, not execute's.
     const projTool = registeredTools.get('cbm_projects');
     const projRes = await projTool.execute({});
-    assert.match(projRes, /OK:list_projects/);
+    assert.equal(typeof projRes, 'object');
+    assert.equal(projRes.ok, true);
+    assert.match(projRes.raw, /OK:list_projects/);
+    assert.match(projTool.output.render({}, projRes)[0].text, /OK:list_projects/);
 
     // Test calling cbm_search with repo path resolving to project
     const searchTool = registeredTools.get('cbm_search');
     const searchRes = await searchTool.execute({ repo: '/home/user/myproject', name_pattern: 'foo' });
-    assert.match(searchRes, /home-user-myproject/);
+    assert.equal(searchRes.ok, true);
+    assert.match(searchRes.raw, /home-user-myproject/);
 
     // Test calling cbm_trace
     const traceTool = registeredTools.get('cbm_trace');
     const traceRes = await traceTool.execute({ project: 'test-p', symbol: 'myFunc' });
-    assert.match(traceRes, /OK:trace_path/);
+    assert.equal(traceRes.ok, true);
+    assert.match(traceRes.raw, /OK:trace_path/);
   } finally {
     client.dispose();
     rmSync(dir, { recursive: true, force: true });

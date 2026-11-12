@@ -1,6 +1,6 @@
 {
   "name": "@lovedolove/dsh-codebase-memory-mcp",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Codebase Memory MCP bridge plugin for DeepSeek Harness: knowledge-graph code search, snippets, architecture, call-path tracing, and auto-started graph visualization UI.",
   "type": "module",
   "main": "src/index.mjs",
@@ -26,25 +26,26 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
-    },
-    "compatibility": {
-      "dshVersions": ">=0.1.2-rc.1 <0.3.0-0",
-      "nodeVersions": ">=18.0.0 <25.0.0"
     }
   },
   "engines": {
-    "node": ">=18.0.0 <25.0.0"
+    "node": ">=18.0.0 <25.0.0",
+    "dsh": ">=0.2.0 <0.3.0"
   },
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "pack:check": "npm pack --dry-run"
   },
+  "devDependencies": {},
+  "dependencies": {
+    "@deepseek-ai/schemastery": "~3.19.0"
+  },
   "peerDependencies": {
     "@deepseek-ai/cordis": ">=4.0.1-rc.1 <5.0.0-0",
-    "@deepseek-ai/dsh-commands": ">=0.1.2-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-skill": ">=0.1.2-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-system-prompt": ">=0.1.2-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-tools": ">=0.1.2-rc.1 <0.3.0-0"
+    "@deepseek-ai/dsh-commands": ">=0.2.0 <0.3.0-0",
+    "@deepseek-ai/dsh-skill": ">=0.2.0 <0.3.0-0",
+    "@deepseek-ai/dsh-system-prompt": ">=0.2.0 <0.3.0-0",
+    "@deepseek-ai/dsh-tools": ">=0.2.0 <0.3.0-0"
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/cordis": {

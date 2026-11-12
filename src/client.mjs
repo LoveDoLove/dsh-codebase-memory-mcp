@@ -18,6 +18,16 @@ import { delimiter, join } from 'node:path'
 import { DEFAULT_UI_PORT } from './types.mjs'
 
 /**
+ * Cancellation must be identifiable by name: the tool pipeline records a call
+ * as ABORTED by checking for `AbortError`, not by message text.
+ */
+function abortError(method) {
+  const err = new Error(`codebase-memory-mcp rpc aborted: ${method}`)
+  err.name = 'AbortError'
+  return err
+}
+
+/**
  * Locate the codebase-memory-mcp executable.
  */
 export function findCodebaseMemoryExe(env = process.env) {
@@ -215,29 +225,44 @@ export class CodebaseMemoryClient {
     this.pending.clear()
   }
 
-  async rpc(method, params = {}, timeoutMs = 60_000) {
+  async rpc(method, params = {}, timeoutMs = 60_000, signal = undefined) {
+    if (signal?.aborted) throw abortError(method)
     await this.ensureStarted()
     const id = this.nextId++
 
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
+      // Every settle path (response, timeout, abort, write failure) must clear
+      // the timer, drop the pending entry, and unhook the abort listener.
+      const finish = (fn, value) => {
+        clearTimeout(timer)
         this.pending.delete(id)
-        reject(new Error(`codebase-memory-mcp rpc timeout: ${method}`))
+        signal?.removeEventListener('abort', onAbort)
+        fn(value)
+      }
+      const timer = setTimeout(() => {
+        finish(reject, new Error(`codebase-memory-mcp rpc timeout: ${method}`))
       }, timeoutMs)
+      const onAbort = () => {
+        finish(reject, abortError(method))
+      }
 
-      this.pending.set(id, { resolve, reject, timer })
+      this.pending.set(id, {
+        resolve: (value) => finish(resolve, value),
+        reject: (err) => finish(reject, err),
+        timer,
+      })
+      signal?.addEventListener('abort', onAbort, { once: true })
 
       try {
         this.child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n')
       } catch (err) {
-        clearTimeout(timer)
-        this.pending.delete(id)
-        reject(err)
+        finish(reject, err)
       }
     })
   }
 
-  async callTool(toolName, args = {}) {
+  async callTool(toolName, args = {}, signal) {
+    if (signal?.aborted) throw abortError('tools/call')
     if (!this.isAvailable) {
       return {
         isError: true,
@@ -250,9 +275,12 @@ export class CodebaseMemoryClient {
       const result = await this.rpc('tools/call', {
         name: toolName,
         arguments: args,
-      })
+      }, 60_000, signal)
       return result
     } catch (err) {
+      // Cancellation is not a degraded result: the tool contract requires
+      // AbortError to propagate so the registry records ABORTED.
+      if (err?.name === 'AbortError') throw err
       this.logger.warn?.(`[cbm-client] tool ${toolName} failed: ${err.message}`)
       return {
         isError: true,
@@ -265,8 +293,8 @@ export class CodebaseMemoryClient {
   /**
    * Compatibility wrapper for raw text output or error throw.
    */
-  async call(name, args = {}) {
-    const r = await this.rpc('tools/call', { name, arguments: args })
+  async call(name, args = {}, signal) {
+    const r = await this.rpc('tools/call', { name, arguments: args }, 60_000, signal)
     if (r?.isError) {
       const parts = (r.content || []).map((c) => (c.type === 'text' ? c.text ?? '' : JSON.stringify(c)))
       throw new Error(parts.join('\n') || `codebase-memory tool failed: ${name}`)
@@ -275,69 +303,69 @@ export class CodebaseMemoryClient {
     return text || '{}'
   }
 
-  async indexRepository(repoPath, project, mode = 'fast') {
+  async indexRepository(repoPath, project, mode = 'fast', signal) {
     const args = { repo_path: repoPath, mode }
     if (project) args.name = project
-    return this.callTool('index_repository', args)
+    return this.callTool('index_repository', args, signal)
   }
 
-  async searchGraph(args = {}) {
-    return this.callTool('search_graph', args)
+  async searchGraph(args = {}, signal) {
+    return this.callTool('search_graph', args, signal)
   }
 
-  async tracePath(args = {}) {
+  async tracePath(args = {}, signal) {
     const payload = {
       project: args.project,
       function_name: args.function_name || args.symbol || '',
       direction: args.direction || 'both',
       depth: args.depth || args.max_depth || args.maxDepth || 3,
     }
-    return this.callTool('trace_path', payload)
+    return this.callTool('trace_path', payload, signal)
   }
 
-  async getCodeSnippet(args = {}) {
+  async getCodeSnippet(args = {}, signal) {
     const payload = {
       project: args.project,
       qualified_name: args.qualified_name || args.qualifiedName || args.symbol || '',
     }
     if (args.start_line || args.startLine) payload.start_line = args.start_line || args.startLine
     if (args.max_lines || args.maxLines) payload.max_lines = args.max_lines || args.maxLines
-    return this.callTool('get_code_snippet', payload)
+    return this.callTool('get_code_snippet', payload, signal)
   }
 
-  async getArchitecture(args = {}) {
+  async getArchitecture(args = {}, signal) {
     const payload = {
       project: args.project,
       path: args.path || args.directory || '',
     }
     if (args.aspects) payload.aspects = args.aspects
-    return this.callTool('get_architecture', payload)
+    return this.callTool('get_architecture', payload, signal)
   }
 
-  async searchCode(args = {}) {
+  async searchCode(args = {}, signal) {
     const payload = {
       project: args.project,
       pattern: args.pattern || args.query || '',
     }
     if (args.file_pattern || args.filePattern) payload.file_pattern = args.file_pattern || args.filePattern
     if (args.limit) payload.limit = args.limit
-    return this.callTool('search_code', payload)
+    return this.callTool('search_code', payload, signal)
   }
 
-  async listProjects() {
-    return this.callTool('list_projects', {})
+  async listProjects(signal) {
+    return this.callTool('list_projects', {}, signal)
   }
 
-  async indexStatus(project) {
-    return this.callTool('index_status', { project })
+  async indexStatus(project, signal) {
+    return this.callTool('index_status', { project }, signal)
   }
 
-  async detectChanges(project) {
-    return this.callTool('detect_changes', { project })
+  async detectChanges(project, signal) {
+    return this.callTool('detect_changes', { project }, signal)
   }
 
-  async checkIndexCoverage(project) {
-    return this.callTool('check_index_coverage', { project })
+  async checkIndexCoverage(project, signal) {
+    return this.callTool('check_index_coverage', { project }, signal)
   }
 
   start() {
@@ -422,7 +450,7 @@ export function autoStartCodebaseMemory(clientOrOpts = getOrCreateClient(), log 
   return client
     .start()
     .then(() => {
-      const msg = '\x1b[36m[codebase-memory]\x1b[0m 🔍 \x1b[1mcodebase-memory UI is live:\x1b[0m \x1b[32mhttp://localhost:9749/\x1b[0m'
+      const msg = `\x1b[36m[codebase-memory]\x1b[0m 🔍 \x1b[1mcodebase-memory UI is live:\x1b[0m \x1b[32mhttp://localhost:${client.port || DEFAULT_UI_PORT}/\x1b[0m`
       announce(msg)
       if (typeof logger?.info === 'function') logger.info(msg)
       else if (typeof logger?.log === 'function') logger.log(msg)

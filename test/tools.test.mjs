@@ -3,7 +3,6 @@ import assert from 'node:assert/strict'
 import {
   createCbmToolDefinitions,
   registerCbmTools,
-  toRawOutputSchema,
   textBlocks,
   resolveWorkspace,
 } from '../src/tools.mjs'
@@ -30,8 +29,7 @@ test('createCbmToolDefinitions includes all 6 code intelligence tools with valid
     assert.ok(typeof tool.execute === 'function', 'tool has execute fn')
     assert.ok(typeof tool.presentCall === 'function', 'tool has presentCall fn')
     if (tool.output?.schema) {
-      const raw = toRawOutputSchema(tool.output.schema)
-      assert.equal(typeof raw, 'object')
+      assert.equal(typeof tool.output.schema, 'object')
     }
   }
 })
