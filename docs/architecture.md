@@ -8,7 +8,7 @@ The plugin sits between the DSH agent and the native `codebase-memory-mcp` execu
 
 `src/engine.mjs` holds `CodeIntelligenceEngine`. It owns per-repository index status, the metadata file, the boundary check and the scrub step. It decides whether a call may proceed and normalizes each answer to a shape such as `{ ok, degraded, message }` plus one payload field.
 
-`src/client.mjs` holds `CodebaseMemoryClient`. It locates the executable, spawns it, frames JSON-RPC, matches replies to requests, respawns after an exit and turns failures into degraded results.
+`src/client.mjs` holds `CodebaseMemoryClient`. It locates the executable, spawns it, frames JSON-RPC, matches replies to requests, respawns lazily on the next call after an exit, and turns failures into degraded results.
 
 `src/tools.mjs` holds the six tool definitions. Each one resolves a working directory, picks a repository root, calls one engine method and renders text through a `render` callback.
 

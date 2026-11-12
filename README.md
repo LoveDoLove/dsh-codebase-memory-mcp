@@ -69,7 +69,7 @@ cbm_snippet  { qualified_name: "app.auth.login" }
 
 Above the tools, the plugin also gives you:
 
-- **A live daemon.** It starts when the plugin applies, respawns if the child exits, and is disposed with the plugin. Nothing to supervise.
+- **A live daemon.** It starts when the plugin applies, and a later tool call respawns it if the child exited. It is disposed with the plugin. Nothing to supervise.
 - **A `/cbm` command.** Prints the executable path, the UI URL, and every indexed project with its status.
 - **A bundled agent skill.** Ranked at 600, model and user invocable, so the agent reaches for the graph before it reaches for grep.
 - **Graceful degradation.** A missing binary logs one warning and the tools return a degraded result. The plugin never fails to load because the daemon is absent.
