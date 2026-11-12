@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.8] - 2026-11-12
+
+### Fixed
+- The autostart notice now reaches the terminal. It was sent through `ctx.logger`, and a `dsh web` boot installs no console exporter on the logger, so the message stayed in an in-memory buffer: the daemon was up while `dsh web` printed nothing. The notice is written to **stderr**, not stdout, because ACP profiles frame their protocol on stdout.
+- A missing executable now says so on the same channel (`codebase-memory-mcp executable not found; the graph UI stays off`). Previously the plugin returned silently, which looked identical to "nothing needed to start".
+
+### Changed
+- `autoStartCodebaseMemory()` owns the availability check and warns on a missing binary. `cbmApply()` no longer pre-filters the call, so the warning cannot be bypassed.
+
 ## [0.1.7] - 2026-11-12
 
 ### Fixed

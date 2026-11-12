@@ -127,20 +127,31 @@ Other ways to install:
 
 ### 3. Start DSH
 
-On plugin load you will see the tool registration log:
-
-```text
-[codebase-memory] registered tools: cbm_projects, cbm_search, cbm_snippet, cbm_arch, cbm_trace, cbm_search_code
-[codebase-memory] registered system prompt guidance
-[codebase-memory] registered /cbm command
-[codebase-memory] registered skill: codebase-memory
-```
-
-The daemon starts during the same load, so http://localhost:9749/ is already
-serving. The autostart logs:
+On plugin load the daemon starts, and the startup notice goes to **stderr**:
 
 ```text
 [codebase-memory] 🔍 codebase-memory UI is live: http://localhost:9749/
+```
+
+That line is the signal that autostart worked. If the executable cannot be
+found, the same channel prints:
+
+```text
+[codebase-memory] codebase-memory-mcp executable not found; the graph UI stays off. Install codebase-memory-mcp or set CBM_EXE.
+```
+
+Both go to stderr rather than stdout because ACP profiles frame their protocol
+on stdout, and rather than `ctx.logger` because a `dsh web` boot installs no
+console exporter on the logger, so anything sent there stays in the in-memory
+buffer and never reaches the terminal. Interleaved diagnostic logs such as
+`[codebase-memory] registered tools: ...` still go through `ctx.logger` and are
+readable from the DSH log view, not the terminal.
+
+Check the daemon directly at any time:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:9749/
+# 200 = the graph UI is up
 ```
 
 ---
@@ -398,7 +409,7 @@ exists on npm, the workflow bumps the patch version, commits the bump with
 |---------|-----|
 | `codebase-memory-mcp executable not found` | Install the executable, set `CBM_EXE` (or `CODEBASE_MEMORY_EXE`), and reload the DSH profile. |
 | Tools return `Code Intelligence Degraded` | The binary is missing or failed to start. Check the path and run `codebase-memory-mcp --version`. |
-| Web UI is not reachable | The daemon starts at plugin load. Check the DSH log for `codebase-memory-mcp failed to start`, then open http://localhost:9749/. Calling a `cbm_*` tool or `/cbm` retries the start. |
+| Web UI is not reachable | Look at the terminal where `dsh web` booted. `codebase-memory UI is live` on stderr means autostart worked; `executable not found` means the binary or `CBM_EXE` is missing. Confirm with `curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:9749/` (200 is up). Calling a `cbm_*` tool or `/cbm` retries the start. |
 | Project not found / empty results | Confirm the repository is indexed (`cbm_projects(reason="...")`) and pass the correct `project` slug or `repo` path. |
 | No symbols after indexing | The plugin does not index automatically; build the index through the library API or the upstream CLI. |
 

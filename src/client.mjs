@@ -401,20 +401,36 @@ export function autoStartCodebaseMemory(clientOrOpts = getOrCreateClient(), log 
     client = clientOrOpts?.client || getOrCreateClient(clientOrOpts)
     logger = clientOrOpts?.log || log
   }
-  if (!client || !client.isAvailable || client.isRunning?.()) return null
+  // A Cordis ctx.logger on a `dsh web` boot has no console exporter, so a
+  // banner sent through it is invisible. Write to stderr as well: stdout is
+  // the ACP protocol stream in some profiles.
+  const announce = (msg) => {
+    try { process.stderr.write(`${msg}\n`) } catch { /* stream closed */ }
+  }
+
+  // Staying silent here would leave the user unable to tell "no daemon because
+  // it is broken" from "no daemon because it was never installed".
+  if (!client) return null
+  if (!client.isAvailable) {
+    const msg = '\x1b[33m[codebase-memory]\x1b[0m codebase-memory-mcp executable not found; the graph UI stays off. Install codebase-memory-mcp or set CBM_EXE.'
+    announce(msg)
+    if (typeof logger?.warn === 'function') logger.warn(msg)
+    return null
+  }
+  if (client.isRunning?.()) return null
 
   return client
     .start()
     .then(() => {
       const msg = '\x1b[36m[codebase-memory]\x1b[0m 🔍 \x1b[1mcodebase-memory UI is live:\x1b[0m \x1b[32mhttp://localhost:9749/\x1b[0m'
+      announce(msg)
       if (typeof logger?.info === 'function') logger.info(msg)
       else if (typeof logger?.log === 'function') logger.log(msg)
-      else console.log(msg)
     })
     .catch((err) => {
       const msg = `[codebase-memory] codebase-memory-mcp failed to start: ${err.message}`
+      announce(msg)
       if (typeof logger?.warn === 'function') logger.warn(msg)
-      else console.warn(msg)
     })
 }
 
@@ -435,9 +451,9 @@ export function cbmApply(ctx, opts = {}) {
 
   const shouldStart = opts.eagerStart !== undefined ? Boolean(opts.eagerStart) : !isTest
 
-  if (shouldStart && client.isAvailable && !client.isRunning?.()) {
-    autoStartCodebaseMemory(client, ctx.logger?.('codebase-memory') || console)
-  }
+  // autoStartCodebaseMemory owns the availability and already-running checks,
+  // plus the stderr notice when the executable is missing.
+  if (shouldStart) autoStartCodebaseMemory(client, ctx.logger?.('codebase-memory') || console)
 
   return client
 }
